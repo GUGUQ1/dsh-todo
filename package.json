@@ -1,7 +1,6 @@
 {
   "name": "dsh-todo",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Project todo list and progress in the DSH right sidebar.",
   "license": "MIT",
@@ -52,5 +51,8 @@
         "@deepseek-ai/dsh-client-ui-sidebar-right"
       ]
     }
+  },
+  "engines": {
+    "dsh": ">=0.2.2-rc.5 <0.3.0-0"
   }
 }
