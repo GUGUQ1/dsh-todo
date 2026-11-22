@@ -1,0 +1,7 @@
+# Text stays LF so a Windows checkout and CI agree; images are binary.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.webp binary
+*.gif binary
+*.zstd binary

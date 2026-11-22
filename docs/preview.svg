@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#f7f8fa"/>
+  <rect x="250" y="24" width="366" height="312" rx="12" fill="#ffffff" stroke="#e3e7ec"/>
+  <text x="274" y="58" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#1f2329">项目计划</text>
+  <text x="588" y="58" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#8a97a8">已完成 2/5</text>
+  <line x1="274" y1="72" x2="592" y2="72" stroke="#e3e7ec"/>
+  <text x="274" y="94" font-family="system-ui, sans-serif" font-size="11" fill="#8a97a8">数据层</text>
+  <text x="312" y="94" font-family="system-ui, sans-serif" font-size="11" fill="#b4bfcb">依次</text>
+  <text x="592" y="94" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#8a97a8">2/3</text>
+  <line x1="274" y1="104" x2="592" y2="104" stroke="#eef1f5"/>
+  <circle cx="281" cy="122" r="4.5" fill="#2f9e63"/>
+  <text x="294" y="126" font-family="system-ui, sans-serif" font-size="12" fill="#b4bfcb">定义计划文件 schema</text>
+  <circle cx="301" cy="144" r="3.5" fill="#2f9e63"/>
+  <text x="312" y="147" font-family="system-ui, sans-serif" font-size="11" fill="#8a97a8">字段与状态校验</text>
+  <circle cx="301" cy="162" r="3.5" fill="none" stroke="#b4bfcb" stroke-width="1.4"/>
+  <text x="312" y="165" font-family="system-ui, sans-serif" font-size="11" fill="#8a97a8">冲突检测规则</text>
+  <circle cx="281" cy="186" r="4.5" fill="#247bbf"/>
+  <text x="294" y="190" font-family="system-ui, sans-serif" font-size="12" fill="#1f2329">原子读写与版本校验</text>
+  <rect x="536" y="177" width="56" height="17" rx="8.5" fill="none" stroke="#e3e7ec"/>
+  <text x="564" y="189" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#8a97a8">11-25</text>
+  <circle cx="281" cy="212" r="4.5" fill="none" stroke="#b4bfcb" stroke-width="1.4"/>
+  <text x="294" y="216" font-family="system-ui, sans-serif" font-size="12" fill="#1f2329">只读面板接入真实数据</text>
+  <text x="274" y="246" font-family="system-ui, sans-serif" font-size="11" fill="#8a97a8">面板</text>
+  <text x="304" y="246" font-family="system-ui, sans-serif" font-size="11" fill="#b4bfcb">并行</text>
+  <text x="592" y="246" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#8a97a8">0/2</text>
+  <line x1="274" y1="256" x2="592" y2="256" stroke="#eef1f5"/>
+  <circle cx="281" cy="274" r="4.5" fill="none" stroke="#b4bfcb" stroke-width="1.4"/>
+  <text x="294" y="278" font-family="system-ui, sans-serif" font-size="12" fill="#1f2329">待办勾选与行内编辑</text>
+  <circle cx="281" cy="300" r="4.5" fill="none" stroke="#b4bfcb" stroke-width="1.4"/>
+  <text x="294" y="304" font-family="system-ui, sans-serif" font-size="12" fill="#1f2329">视觉打磨与暗色适配</text>
+  <text x="274" y="330" font-family="system-ui, sans-serif" font-size="10" fill="#b4bfcb">M0 脚手架：示例数据</text>
+</svg>

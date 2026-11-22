@@ -1,0 +1,23 @@
+name: Feature request
+description: 想要新的能力，或现有行为不对
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决什么
+      description: 先说场景与痛点，再说想要的方案。
+      placeholder: 我的计划有 40 多条，想按「本周 / 以后」分视图。
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你设想的做法（可选）
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 现在你怎么绕过（可选）
+      description: 临时做法也能说明痛点有多真。

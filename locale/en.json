@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Project plan",
+    "description": "A project plan panel in the right sidebar: stages, sub-items, dependencies and due dates, written into one todolist.json by both you and the agent.",
+    "detail": "docs/DETAIL.md"
+  }
+}

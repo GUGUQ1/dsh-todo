@@ -1,0 +1,67 @@
+name: Bug report
+description: 面板打不开、点了没反应、助手看不见工具……
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先看一眼 [docs/FAQ.md](https://github.com/GUGUQ1/dsh-todo/blob/main/docs/FAQ.md)，
+        「点了没反应」和「助手看不见工具」两大类基本都在那里。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 你做了什么、期待什么、实际看到什么。
+      placeholder: 我点了左侧圆点，行没有变化，也没有任何提示。
+    validations:
+      required: true
+
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DSH 版本
+      description: 设置 → 关于，或启动器里显示的版本。
+      placeholder: 0.2.2-rc.5
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: 系统
+      placeholder: Windows 11 / macOS 15 / Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: input
+    id: panel-file
+    attributes:
+      label: 面板页脚的文件与版本
+      description: 面板最底部那行，例如 `文件 dsh-todo/todolist.json · rev 149`。
+      placeholder: 文件 todolist.json · rev 12
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 注册状态（可选）
+      description: |
+        `%TEMP%\dsh-todo-tool-status.json`（macOS/Linux 为 `$TMPDIR` 下同名文件）的内容。
+        它说明模型工具与技能有没有注册上。
+      render: json
+      placeholder: '{"tool":{"ok":true,"name":"todolist","parameters":12,"at":"…"}}'
+
+  - type: textarea
+    id: errors
+    attributes:
+      label: 报错文字
+      description: 面板里的红条/黄条，或浏览器控制台（`Ctrl+Shift+I`）的第一行。
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 自查
+      options:
+        - label: 我刷新过页面（`Ctrl+R`），宿主代码有改动时也重启过 DSH
+        - label: 我看过 FAQ，不是那几条已知情况

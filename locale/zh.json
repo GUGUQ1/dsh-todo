@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "项目计划",
+    "description": "右栏里的项目计划面板：阶段、子事项、前后依赖与截止日期，你和助手共写同一个 todolist.json。",
+    "detail": "docs/DETAIL.md"
+  }
+}
