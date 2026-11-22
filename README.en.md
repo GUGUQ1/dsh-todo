@@ -112,8 +112,7 @@ See [SECURITY.md](SECURITY.md) and [docs/PRIVACY.md](docs/PRIVACY.md).
 - Stage counts cover top-level items only; children are not in the denominator.
 - One "next" at a time, while several items may be "in progress".
 - The panel cannot mark "in progress" itself; that is the point of the split above.
-- **DSH on Linux / macOS is untested**: the panel is plain browser code and the host half uses only 
-ode: built-ins, so it should work, but only Windows 11 with DSH 0.2.2-rc.5 has been verified.
+- **DSH on Linux / macOS is untested**: the panel is plain browser code and the host half uses only `node:` built-ins, so it should work, but only Windows 11 with DSH 0.2.2-rc.5 has been verified.
 
 ## Documentation
 

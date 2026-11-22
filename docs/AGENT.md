@@ -64,12 +64,15 @@
 ## 工具速查
 
 ```text
-todolist {"action":"read"}                                  读计划（带 id、状态、依赖、下一步）
-todolist {"action":"add","title":"…","groupId":"m2"}        加事项
-todolist {"action":"addChild","parentId":"m2a","title":"…"} 加子项
+todolist {"action":"read"}                                                读计划（带 id、状态、依赖、下一步）
+todolist {"action":"addGroup","title":"…","mode":"sequence"|"parallel"|"free"} 加阶段
+todolist {"action":"add","title":"…","groupId":"m2","after":["m1a"],"due":"2026-12-01"} 加事项（可带依赖与截止日期）
+todolist {"action":"addChild","parentId":"m2a","title":"…"}               加子项
 todolist {"action":"status","id":"m2a","status":"in_progress"}
-todolist {"action":"next","id":"m2a"}                       设为下一步（id 传 null 清空）
-todolist {"action":"rename"|"due"|"remove"|"move"|"reorder"|"settings"|"open"|"create", …}
+todolist {"action":"next","id":"m2a"}                                     设为下一步（id 传 null 清空）
+todolist {"action":"note","id":"m2a","note":"…"}                          写/清备注
+todolist {"action":"settings","style":"vivid"|"md3"|"paper"|"calm"}       外观默认 vivid，可切四档（md3 为 Material Design）
+todolist {"action":"rename"|"due"|"remove"|"move"|"reorder"|"reorderGroups"|"open"|"create", …}
 ```
 
 完整操作列表与文件格式见仓库的 `SPEC.md`。

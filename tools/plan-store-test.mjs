@@ -430,6 +430,7 @@ await test('外观：默认灵动 + 高级材质开；非法值被拒；修复�
   assert.equal(plan.ui.style, 'vivid', 'vivid is the default look')
   assert.equal(plan.ui.material, true, 'materials default on')
   assert.equal(applyOp(plan, { op: 'settings', style: 'calm' }).plan.ui.style, 'calm')
+  assert.equal(applyOp(plan, { op: 'settings', style: 'md3' }).plan.ui.style, 'md3')
   assert.equal(applyOp(plan, { op: 'settings', material: false }).plan.ui.material, false)
   assert.equal(applyOp(plan, { op: 'settings', style: 'vivid' }).plan.ui.style, 'vivid')
   assert.equal(applyOp(plan, { op: 'settings', style: 'noir' }).ok, false)
@@ -442,6 +443,105 @@ await test('外观：默认灵动 + 高级材质开；非法值被拒；修复�
   const repaired = repairPlan(broken)
   assert.equal(repaired.plan.ui.style, 'vivid', 'repair falls back to vivid')
   assert.equal(repaired.plan.ui.material, true, 'repair falls back to materials on')
+})
+
+await test('修复：仅含未知字段时仍记录 note 并写盘递增 rev', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-todo-test-'))
+  try {
+    const file = join(dir, 'todolist.json')
+    const broken = sample()
+    broken.items[0].titel = 'typo'
+    await writeFile(file, `${JSON.stringify(broken, null, 2)}\n`, 'utf8')
+    const repaired = await repairPlanFile(file)
+    assert.equal(repaired.ok, true)
+    assert.equal(repaired.rev, 3, 'rev increments on unknown field cleanup')
+    assert.ok(repaired.notes.some(note => note.includes('titel')))
+    const after = await readPlanFile(file)
+    assert.equal(after.ok, true)
+    assert.equal(after.plan.items[0].titel, undefined)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+await test('move 与 reorder 支持移入未分组，拒绝不存在的阶段，且跨阶段各自顺序编号', () => {
+  const plan = validPlanWithTwoGroups()
+  const movedNull = applyOp(plan, { op: 'move', id: 'a', order: 1, groupId: null })
+  assert.equal(movedNull.ok, true)
+  assert.equal(movedNull.plan.items.find(item => item.id === 'a').groupId, undefined)
+
+  const reorderedNone = applyOp(plan, { op: 'reorder', ids: ['a'], groupId: '__none' })
+  assert.equal(reorderedNone.ok, true)
+  assert.equal(reorderedNone.plan.items.find(item => item.id === 'a').groupId, undefined)
+
+  const badStage = applyOp(plan, { op: 'reorder', ids: ['a'], groupId: 'nonexistent' })
+  assert.equal(badStage.ok, false)
+
+  // Cross-stage reorder: moving 'a' from g1 into g2 before 'c' gives g2 unique 1..2
+  const cross = applyOp(plan, { op: 'reorder', ids: ['a', 'c'], groupId: 'g2' })
+  assert.equal(cross.ok, true)
+  const g2Items = cross.plan.items.filter(item => item.groupId === 'g2').sort((x, y) => x.order - y.order)
+  assert.deepEqual(g2Items.map(item => [item.id, item.order]), [['a', 1], ['c', 2]])
+
+  // Moving one item into a stage that already has another item keeps unique 1..N per stage
+  const multi = validatePlan({
+    ...sample(),
+    groups: [
+      { id: 'g1', title: '阶段一', mode: 'free', order: 1 },
+      { id: 'g2', title: '阶段二', mode: 'free', order: 2 },
+    ],
+    items: [
+      { id: 'a', groupId: 'g1', order: 1, title: '第一项', status: 'pending' },
+      { id: 'b', groupId: 'g1', order: 2, title: '第二项', status: 'pending' },
+      { id: 'c', groupId: 'g2', order: 1, title: '第三项', status: 'pending' },
+    ],
+  }).plan
+  const partialCross = applyOp(multi, { op: 'reorder', ids: ['a', 'c'], groupId: 'g2' })
+  assert.equal(partialCross.ok, true)
+  assert.equal(partialCross.plan.items.find(item => item.id === 'b').order, 1)
+  assert.deepEqual(
+    partialCross.plan.items.filter(item => item.groupId === 'g2').map(item => [item.id, item.order]),
+    [['a', 1], ['c', 2]],
+  )
+
+  // move (same stage & cross-stage) and add(order) keep unique continuous 1..N per stage
+  const movedSame = applyOp(multi, { op: 'move', id: 'b', order: 1 })
+  assert.equal(movedSame.ok, true)
+  assert.deepEqual(
+    movedSame.plan.items.filter(item => item.groupId === 'g1').sort((x, y) => x.order - y.order).map(item => [item.id, item.order]),
+    [['b', 1], ['a', 2]],
+  )
+
+  const movedCross = applyOp(multi, { op: 'move', id: 'c', order: 1, groupId: 'g1' })
+  assert.equal(movedCross.ok, true)
+  assert.deepEqual(
+    movedCross.plan.items.filter(item => item.groupId === 'g1').sort((x, y) => x.order - y.order).map(item => [item.id, item.order]),
+    [['c', 1], ['a', 2], ['b', 3]],
+  )
+
+  const addedAtHead = applyOp(multi, { op: 'add', groupId: 'g1', title: '插队项', order: 1 }, () => 'd')
+  assert.equal(addedAtHead.ok, true)
+  assert.deepEqual(
+    addedAtHead.plan.items.filter(item => item.groupId === 'g1').sort((x, y) => x.order - y.order).map(item => [item.id, item.order]),
+    [['d', 1], ['a', 2], ['b', 3]],
+  )
+
+  // reorderGroups with a subset of stage ids keeps all stage orders unique and continuous 1..N
+  const threeGroups = validatePlan({
+    ...sample(),
+    groups: [
+      { id: 'g1', title: '阶段一', mode: 'free', order: 1 },
+      { id: 'g2', title: '阶段二', mode: 'free', order: 2 },
+      { id: 'g3', title: '阶段三', mode: 'free', order: 3 },
+    ],
+    items: [],
+  }).plan
+  const partialGroups = applyOp(threeGroups, { op: 'reorderGroups', ids: ['g3'] })
+  assert.equal(partialGroups.ok, true)
+  assert.deepEqual(
+    partialGroups.plan.groups.slice().sort((x, y) => x.order - y.order).map(group => [group.id, group.order]),
+    [['g3', 1], ['g1', 2], ['g2', 3]],
+  )
 })
 
 if (process.exitCode === 1) {

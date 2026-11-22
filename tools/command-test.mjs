@@ -5,7 +5,7 @@
  * registry and a temp directory: no DSH process, no agent.
  */
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { apply, registerSessionPrompt } from '../index.js'
@@ -70,9 +70,33 @@ try {
   assert.equal(wrongName.kind, 'error', 'only a plan file may be written')
   assert.match(wrongName.text, /todolist\.json/)
 
+  const suffixName = await handler({ agent, rawInput: opLine({ path: join(dir, 'foo-todolist.json'), op: 'toggle', id: 'a' }) })
+  assert.equal(suffixName.kind, 'error', 'a suffix match must not pass basename check')
+  assert.match(suffixName.text, /todolist\.json/)
+
+  const noWorkspace = await handler({ agent: { session: {} }, rawInput: opLine({ path: file, op: 'toggle', id: 'a' }) })
+  assert.equal(noWorkspace.kind, 'error', 'missing workspace cwd must fail-closed')
+  assert.match(noWorkspace.text, /工作区/)
+
   const outside = await handler({ agent, rawInput: opLine({ path: join(tmpdir(), 'todolist.json'), op: 'toggle', id: 'a' }) })
   assert.equal(outside.kind, 'error', 'a path outside the workspace is refused')
   assert.match(outside.text, /工作区/)
+
+  // S1: symlink / directory junction inside workspace pointing outside must be blocked
+  const outsideDir = await mkdtemp(join(tmpdir(), 'dsh-todo-outside-'))
+  const linkDir = join(dir, 'escape')
+  try {
+    const outsidePlan = join(outsideDir, 'todolist.json')
+    await writeFile(outsidePlan, `${JSON.stringify(sample, null, 2)}\n`, 'utf8')
+    await symlink(outsideDir, linkDir, process.platform === 'win32' ? 'junction' : 'dir')
+    const symlinkEscape = await handler({ agent, rawInput: opLine({ path: join(linkDir, 'todolist.json'), op: 'toggle', id: 'a' }) })
+    assert.equal(symlinkEscape.kind, 'error', 'a symlink escaping the workspace must be refused')
+    assert.match(symlinkEscape.text, /工作区/)
+    assert.equal(JSON.parse(await readFile(outsidePlan, 'utf8')).rev, 1, 'outside file must remain untouched')
+  } finally {
+    await rm(linkDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 })
+    await rm(outsideDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 })
+  }
 
   const unknownOp = await handler({ agent, rawInput: opLine({ path: file, op: 'explode', id: 'a' }) })
   assert.equal(unknownOp.kind, 'error')
@@ -103,7 +127,7 @@ try {
   // the session on its next load.
   const notes = []
   const notifier = {
-    session: {},
+    session: { cwd: dir },
     inject: message => notes.push(['inject', message]),
     followup: message => notes.push(['followup', message]),
   }
@@ -163,14 +187,39 @@ try {
 
   await handler({ agent: notifier, rawInput: opLine({ path: file, op: { op: 'settings', notify: 'next-turn' } }) })
   await wait()
-  const quiet = { session: { id: 's-quiet' }, inject: message => notes.push(['inject', message]) }
+  const quiet = { session: { id: 's-quiet', cwd: dir }, inject: message => notes.push(['inject', message]) }
   await handler({ agent: quiet, rawInput: opLine({ op: { op: 'session', enabled: false } }) })
   const beforeQuiet = notes.length
   await writeFile(file, `${JSON.stringify(sample, null, 2)}\n`, 'utf8')
   await handler({ agent: quiet, rawInput: opLine({ path: file, op: { op: 'toggle', id: 'a' } }) })
   await wait()
   assert.equal(notes.length, beforeQuiet, 'a switched-off Session is not notified')
+
+  // Removing an item announces its title, not its random id.
+  await writeFile(file, `${JSON.stringify(sample, null, 2)}\n`, 'utf8')
+  const removedRes = await handler({ agent: notifier, rawInput: opLine({ path: file, op: { op: 'remove', id: 'a' } }) })
+  assert.equal(removedRes.kind, 'success')
+  await wait()
+  assert.match(noticeText(notes.at(-1)[1]), /删除了 「事项」/)
+
+  // Turning notify off (or disabling session) cancels a pending timer before it fires.
+  await writeFile(file, `${JSON.stringify(sample, null, 2)}\n`, 'utf8')
+  const beforeCancel = notes.length
+  await handler({ agent: notifier, rawInput: opLine({ path: file, op: { op: 'toggle', id: 'a' } }) })
+  await handler({ agent: notifier, rawInput: opLine({ path: file, op: { op: 'settings', notify: 'off' } }) })
+  await wait()
+  assert.equal(notes.length, beforeCancel, 'switching notify off cancels queued timer')
+
+  await writeFile(file, `${JSON.stringify(sample, null, 2)}\n`, 'utf8')
+  const sessionTimerAgent = { session: { id: 's-cancel', cwd: dir }, inject: message => notes.push(['inject', message]) }
+  await handler({ agent: sessionTimerAgent, rawInput: opLine({ op: { op: 'session', enabled: true } }) })
+  const beforeSessionCancel = notes.length
+  await handler({ agent: sessionTimerAgent, rawInput: opLine({ path: file, op: { op: 'toggle', id: 'a' } }) })
+  await handler({ agent: sessionTimerAgent, rawInput: opLine({ op: { op: 'session', enabled: false } }) })
+  await wait()
+  assert.equal(notes.length, beforeSessionCancel, 'disabling session switch cancels queued timer')
+
   console.log('dsh-todo command tests: OK')
 } finally {
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 })
 }

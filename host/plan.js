@@ -31,7 +31,7 @@ const CHILD_KEYS = new Set(['id', 'title', 'status'])
 export const NOTIFY_MODES = ['next-turn', 'wake', 'off']
 
 /** Panel looks the user can pick between. */
-export const STYLES = ['paper', 'calm', 'vivid']
+export const STYLES = ['paper', 'calm', 'vivid', 'md3']
 
 /**
  * A fresh, empty plan.
@@ -231,6 +231,19 @@ export function repairPlan(value) {
     notes.push(`version 是 ${String(raw.version)}，已写成 ${PLAN_VERSION}`)
   }
   const drop = (at, why) => { notes.push(`${at} ${why}，已移除`) }
+  const dropUnknown = (obj, allowed, label) => {
+    for (const key of Object.keys(obj)) {
+      if (!allowed.has(key)) notes.push(`${label} 的未知字段「${key}」已移除`)
+    }
+  }
+  if (raw === value) {
+    dropUnknown(raw, TOP_KEYS, '根')
+    if (!Number.isInteger(raw.rev) || raw.rev < 0) notes.push('rev 不合法，已重置为 0')
+    if (raw.title !== undefined && typeof raw.title !== 'string') notes.push('title 不是字符串，已清空')
+    if (raw.groups !== undefined && !Array.isArray(raw.groups)) notes.push('groups 不是数组，已按空数组重建')
+    if (raw.items !== undefined && !Array.isArray(raw.items)) notes.push('items 不是数组，已按空数组重建')
+    if (raw.ui !== undefined && !isObject(raw.ui)) notes.push('ui 不是对象，已重置')
+  }
 
   const groups = []
   const groupIds = new Set()
@@ -242,6 +255,7 @@ export function repairPlan(value) {
     if (id === '') { drop(at, '缺 id'); continue }
     if (groupIds.has(id)) { drop(at, `id 重复（${id}）`); continue }
     if (title === '') { drop(at, `「${id}」缺标题`); continue }
+    dropUnknown(group, GROUP_KEYS, `${at}「${title}」`)
     if (group.mode !== undefined && !MODES.includes(group.mode)) notes.push(`${at}.mode 不合法，已改成 free`)
     if (group.order !== undefined && !Number.isInteger(group.order)) notes.push(`${at}.order 不是整数，已重排`)
     groupIds.add(id)
@@ -266,14 +280,21 @@ export function repairPlan(value) {
     if (title === '') { drop(at, `「${id}」缺标题`); continue }
     itemIds.add(id)
     allIds.add(id)
+    dropUnknown(item, ITEM_KEYS, `${at}「${title}」`)
 
     if (!STATUSES.includes(item.status)) notes.push(`${at}「${title}」的状态不合法，已改成 pending`)
+    if (item.order !== undefined && !Number.isInteger(item.order)) notes.push(`${at}「${title}」的 order 不是整数，已移除`)
+    if (item.groupId !== undefined && typeof item.groupId !== 'string') {
+      notes.push(`${at}「${title}」的 groupId 不是字符串，已移到未分组`)
+    }
     const groupId = typeof item.groupId === 'string' && groupIds.has(item.groupId) ? item.groupId : undefined
     if (typeof item.groupId === 'string' && groupId === undefined) {
       notes.push(`${at}「${title}」的阶段「${item.groupId}」不存在，已移到未分组`)
     }
+    if (item.after !== undefined && !Array.isArray(item.after)) notes.push(`${at}「${title}」的 after 不是数组，已清掉`)
     if (item.due !== undefined && !isDueValue(item.due)) notes.push(`${at}「${title}」的截止日期不合法，已清掉`)
     if (item.note !== undefined && typeof item.note !== 'string') notes.push(`${at}「${title}」的备注不是字符串，已清掉`)
+    if (item.children !== undefined && !Array.isArray(item.children)) notes.push(`${at}「${title}」的 children 不是数组，已清掉`)
 
     const children = []
     for (const [childIndex, child] of (Array.isArray(item.children) ? item.children : []).entries()) {
@@ -285,6 +306,7 @@ export function repairPlan(value) {
       if (allIds.has(childId)) { drop(childAt, `id 重复（${childId}）`); continue }
       if (childTitle === '') { drop(childAt, `「${childId}」缺标题`); continue }
       allIds.add(childId)
+      dropUnknown(child, CHILD_KEYS, `${childAt}「${childTitle}」`)
       if (!STATUSES.includes(child.status)) notes.push(`${childAt}「${childTitle}」的状态不合法，已改成 pending`)
       children.push({ id: childId, title: childTitle, status: STATUSES.includes(child.status) ? child.status : 'pending' })
     }
@@ -343,16 +365,34 @@ export function repairPlan(value) {
   const rawUi = isObject(raw.ui) ? raw.ui : {}
   const ui = {}
   for (const [key, entry] of Object.entries(rawUi)) if (!UI_KEYS.has(key)) ui[key] = entry
+  if (rawUi.hideCompleted !== undefined && typeof rawUi.hideCompleted !== 'boolean') {
+    notes.push('ui.hideCompleted 不合法，已重置为 false')
+  }
   if (typeof rawUi.hideCompleted === 'boolean') ui.hideCompleted = rawUi.hideCompleted
+  if (rawUi.openRequest !== undefined && (!Number.isInteger(rawUi.openRequest) || rawUi.openRequest < 0)) {
+    notes.push('ui.openRequest 不合法，已重置为 0')
+  }
   if (Number.isInteger(rawUi.openRequest) && rawUi.openRequest >= 0) ui.openRequest = rawUi.openRequest
+  if (rawUi.notify !== undefined && !NOTIFY_MODES.includes(rawUi.notify)) {
+    notes.push('ui.notify 不合法，已改成 next-turn')
+  }
   if (NOTIFY_MODES.includes(rawUi.notify)) ui.notify = rawUi.notify
+  if (rawUi.notifyWindow !== undefined && (!Number.isInteger(rawUi.notifyWindow) || rawUi.notifyWindow < 1 || rawUi.notifyWindow > 600)) {
+    notes.push('ui.notifyWindow 不合法，已重置为 8')
+  }
   if (Number.isInteger(rawUi.notifyWindow) && rawUi.notifyWindow >= 1 && rawUi.notifyWindow <= 600) {
     ui.notifyWindow = rawUi.notifyWindow
+  }
+  if (rawUi.next !== undefined && rawUi.next !== null && typeof rawUi.next !== 'string') {
+    notes.push('「下一步」不合法，已清掉')
   }
   const next = typeof rawUi.next === 'string' && itemIds.has(rawUi.next) ? rawUi.next : null
   if (typeof rawUi.next === 'string' && next === null) notes.push('「下一步」指向的事项不存在，已清掉')
   if (rawUi.style !== undefined && !STYLES.includes(rawUi.style)) notes.push('ui.style 不合法，已改成 vivid')
   const style = STYLES.includes(rawUi.style) ? rawUi.style : 'vivid'
+  if (rawUi.material !== undefined && typeof rawUi.material !== 'boolean') {
+    notes.push('ui.material 不合法，已重置为 true')
+  }
   const material = typeof rawUi.material === 'boolean' ? rawUi.material : true
 
   const plan = {
@@ -463,6 +503,17 @@ export function applyOp(plan, op, nextId = defaultNextId(plan)) {
     const checked = validatePlan({ ...next, rev: plan.rev })
     return checked.ok ? { ok: true, plan: next } : fail(checked.errors.join('; '))
   }
+  const groupKeyOf = candidate => candidate.groupId ?? '__none'
+  const renumberStage = (groupKeyValue, pinnedItem, targetOrder = 1) => {
+    const others = items()
+      .filter(candidate => candidate !== pinnedItem && groupKeyOf(candidate) === groupKeyValue)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    if (pinnedItem !== undefined && groupKeyOf(pinnedItem) === groupKeyValue) {
+      const slot = Math.max(0, Math.min(others.length, targetOrder - 1))
+      others.splice(slot, 0, pinnedItem)
+    }
+    others.forEach((candidate, index) => { candidate.order = index + 1 })
+  }
 
   switch (op.op) {
     case 'status': {
@@ -507,15 +558,20 @@ export function applyOp(plan, op, nextId = defaultNextId(plan)) {
     case 'add': {
       const title = typeof op.title === 'string' ? op.title.trim() : ''
       if (title === '') return fail('title 不能为空')
-      const groupId = op.groupId
+      const ungrouped = op.groupId === null || op.groupId === '__none' || op.groupId === ''
+      const groupId = ungrouped ? undefined : op.groupId
       if (groupId !== undefined && !next.groups.some(group => group.id === groupId)) return fail(`找不到阶段 "${groupId}"`)
-      const order = Number.isInteger(op.order) ? op.order : (items().filter(item => item.groupId === groupId).length + 1)
+      const groupKey = groupId ?? '__none'
+      const stageCount = items().filter(candidate => groupKeyOf(candidate) === groupKey).length
+      const order = Number.isInteger(op.order) ? op.order : (stageCount + 1)
       const item = {
         id: nextId(), ...(groupId === undefined ? {} : { groupId }), order, title, status: 'pending',
         ...(Array.isArray(op.after) && op.after.length > 0 ? { after: op.after } : {}),
         ...(isDueValue(op.due) ? { due: op.due } : {}),
+        ...(typeof op.note === 'string' && op.note !== '' ? { note: op.note } : {}),
       }
       items().push(item)
+      renumberStage(groupKey, item, order)
       return done()
     }
     case 'addChild': {
@@ -553,11 +609,19 @@ export function applyOp(plan, op, nextId = defaultNextId(plan)) {
       const item = items().find(candidate => candidate.id === op.id)
       if (item === undefined) return fail(`找不到事项 "${op.id}"`)
       if (!Number.isInteger(op.order)) return fail('order 必须是整数')
-      item.order = op.order
+      const prevKey = groupKeyOf(item)
       if (op.groupId !== undefined) {
-        if (!next.groups.some(group => group.id === op.groupId)) return fail(`找不到阶段 "${op.groupId}"`)
-        item.groupId = op.groupId
+        if (op.groupId === null || op.groupId === '__none' || op.groupId === '') {
+          delete item.groupId
+        } else if (!next.groups.some(group => group.id === op.groupId)) {
+          return fail(`找不到阶段 "${op.groupId}"`)
+        } else {
+          item.groupId = op.groupId
+        }
       }
+      const nextKey = groupKeyOf(item)
+      renumberStage(nextKey, item, op.order)
+      if (prevKey !== nextKey) renumberStage(prevKey)
       return done()
     }
     case 'addGroup': {
@@ -610,16 +674,41 @@ export function applyOp(plan, op, nextId = defaultNextId(plan)) {
     }
     case 'reorder': {
       if (!Array.isArray(op.ids) || op.ids.some(id => typeof id !== 'string')) return fail('ids 必须是字符串数组')
+      const toUngrouped = op.groupId === null || op.groupId === '__none' || op.groupId === ''
+      if (op.groupId !== undefined && !toUngrouped) {
+        if (typeof op.groupId !== 'string' || !next.groups.some(group => group.id === op.groupId)) {
+          return fail(`找不到阶段 "${op.groupId}"`)
+        }
+      }
       const byId = new Map(items().map(item => [item.id, item]))
       const seen = new Set()
-      let order = 1
       for (const id of op.ids) {
         const item = byId.get(id)
         if (item === undefined) return fail(`找不到事项 "${id}"`)
         if (seen.has(id)) return fail(`ids 里 "${id}" 重复`)
         seen.add(id)
-        item.order = order++
-        if (op.groupId !== undefined && next.groups.some(group => group.id === op.groupId)) item.groupId = op.groupId
+        if (op.groupId !== undefined) {
+          if (toUngrouped) delete item.groupId
+          else item.groupId = op.groupId
+        }
+      }
+      const groupKey = item => item.groupId ?? '__none'
+      const counters = new Map()
+      for (const id of op.ids) {
+        const item = byId.get(id)
+        const key = groupKey(item)
+        const n = (counters.get(key) ?? 0) + 1
+        counters.set(key, n)
+        item.order = n
+      }
+      const remaining = items()
+        .filter(item => !seen.has(item.id))
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      for (const item of remaining) {
+        const key = groupKey(item)
+        const n = (counters.get(key) ?? 0) + 1
+        counters.set(key, n)
+        item.order = n
       }
       return done()
     }
@@ -635,6 +724,10 @@ export function applyOp(plan, op, nextId = defaultNextId(plan)) {
         seen.add(id)
         group.order = order++
       }
+      const remaining = next.groups
+        .filter(group => !seen.has(group.id))
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      for (const group of remaining) group.order = order++
       return done()
     }
     case 'open': {
@@ -707,11 +800,25 @@ export function defaultNextId(plan) {
  */
 export async function readPlanFile(file) {
   let text
-  try {
-    text = await readFile(file, 'utf8')
-  } catch (error) {
-    if (error?.code === 'ENOENT') return { ok: false, error: 'missing' }
-    return { ok: false, error: `read-failed: ${error?.message ?? String(error)}` }
+  let version
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const before = await stat(file).catch(() => undefined)
+    try {
+      text = await readFile(file, 'utf8')
+    } catch (error) {
+      if (error?.code === 'ENOENT') return { ok: false, error: 'missing' }
+      return { ok: false, error: `read-failed: ${error?.message ?? String(error)}` }
+    }
+    const after = await stat(file).catch(() => undefined)
+    const beforeVer = before === undefined ? undefined : `${before.size}:${before.mtimeMs}`
+    const afterVer = after === undefined ? undefined : `${after.size}:${after.mtimeMs}`
+    if (beforeVer !== undefined && beforeVer === afterVer) {
+      version = beforeVer
+      break
+    }
+    // Concurrent modification during read: retry once, then poison version so
+    // any subsequent write refuses to overwrite instead of skipping the check.
+    version = before !== undefined || after !== undefined ? 'stale' : undefined
   }
   let parsed
   try {
@@ -721,8 +828,7 @@ export async function readPlanFile(file) {
   }
   const checked = validatePlan(parsed)
   if (!checked.ok) return { ok: false, error: `invalid-plan: ${checked.errors.join('; ')}`, text }
-  const info = await stat(file).catch(() => undefined)
-  return { ok: true, plan: checked.plan, text, version: info === undefined ? undefined : `${info.size}:${info.mtimeMs}` }
+  return { ok: true, plan: checked.plan, text, version }
 }
 
 /**
@@ -764,6 +870,7 @@ export async function writePlanFile(file, plan, { expectedVersion } = {}) {
  * @returns `{ ok: true, rev, plan, notes }` or `{ ok: false, error, notes? }`.
  */
 export async function repairPlanFile(file, { expectedVersion } = {}) {
+  const before = await stat(file).catch(() => undefined)
   let text
   try {
     text = await readFile(file, 'utf8')
@@ -771,6 +878,12 @@ export async function repairPlanFile(file, { expectedVersion } = {}) {
     if (error?.code === 'ENOENT') return { ok: false, error: 'missing' }
     return { ok: false, error: `read-failed: ${error?.message ?? String(error)}` }
   }
+  const after = await stat(file).catch(() => undefined)
+  const beforeVer = before === undefined ? undefined : `${before.size}:${before.mtimeMs}`
+  const afterVer = after === undefined ? undefined : `${after.size}:${after.mtimeMs}`
+  const version = beforeVer !== undefined && beforeVer === afterVer
+    ? beforeVer
+    : (before !== undefined || after !== undefined ? 'stale' : undefined)
   let parsed
   try {
     parsed = JSON.parse(text)
@@ -779,10 +892,11 @@ export async function repairPlanFile(file, { expectedVersion } = {}) {
   }
   const repaired = repairPlan(parsed)
   if (!repaired.ok) return { ok: false, error: `repair-failed: ${repaired.error}`, notes: repaired.notes }
+  if (repaired.notes.length === 0 && !validatePlan(parsed).ok) {
+    repaired.notes.push('已清理不合法字段')
+  }
   // Nothing to drop: leave the file alone, so a stray repair click is a no-op.
   if (repaired.notes.length === 0) return { ok: true, rev: repaired.plan.rev, plan: repaired.plan, notes: [] }
-  const info = await stat(file).catch(() => undefined)
-  const version = info === undefined ? undefined : `${info.size}:${info.mtimeMs}`
   const written = await writePlanFile(file, repaired.plan, { expectedVersion: expectedVersion ?? version })
   return { ...written, notes: repaired.notes }
 }

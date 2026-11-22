@@ -25,7 +25,7 @@
 | `ui.notify` | string | 否 | 面板改动怎么告诉助手：`next-turn` / `wake` / `off`，默认 `next-turn` |
 | `ui.notifyWindow` | number | 否 | 合并窗口（秒，1..600，默认 8）：窗口内的连续改动合并成一条通知 |
 | `ui.next` | string \| null | 否 | 用户指定的「下一步」事项 id；`null` 表示按顺序自动推断 |
-| `ui.style` | `vivid` \| `paper` \| `calm` | 否 | 面板外观；默认 `vivid`（灵动：彩色标题栏 + 4px 导轨 + 同色描边）。`paper` 是纸感，`calm` 最收敛（阶段标题不染色） |
+| `ui.style` | `vivid` \| `md3` \| `paper` \| `calm` | 否 | 面板外观；默认 `vivid`（灵动：彩色标题栏 + 4px 导轨 + 同色描边）。`md3` 采用 Google Material Design 3 风格（大圆角色调容器、胶囊徽章与状态层），`paper` 是纸感，`calm` 最收敛（阶段标题不染色） |
 | `ui.material` | boolean | 否 | 高级材质（渐变/分层投影/毛玻璃）；默认 `true`，关掉更省性能 |
 | `groups` | array | 是 | 阶段；没有阶段时留空数组，所有事项进默认组 |
 | `items` | array | 是 | 顶层事项 |
@@ -85,7 +85,7 @@
 
 拖拽排序先落在面板内存里：松手后不立即写文件，**面板底部的固定条**出现「把「A」移到「B」之后」，点确认才写 `reorder`（事项）或 `reorderGroups`（阶段），6 秒内没确认就丢弃这次调整、列表弹回原顺序。
 
-- 事项可以拖到同一个阶段里的任意位置，也可以**拖进另一个阶段**（发送 `reorder` 时带目标 `groupId`）；
+- 事项可以拖到同一个阶段里的任意位置，也可以**拖进另一个阶段**或**未分组**（`move` / `reorder` 带目标 `groupId`，传 `null` / `"__none"` / `""` 表示移回未分组）；
 - 阶段可以整块拖（拖阶段标题），发送 `reorderGroups` 重写阶段 `order`；
 - 拖动只能从**抓手**开始（事项行左侧、阶段标题左侧的六点抓手，悬停时出现），行本身不可拖——否则点圆点/翻状态时会被拖拽手势吃掉；
 - 拖动时的插入位置用 2px 强调色线 + 左端小圆点标出：落在某一行上时画在那行前/后，落在阶段空白处时画在最后一行下方（表示追加到末尾），被拖的行/卡片半透明；
@@ -147,7 +147,7 @@
 /todo op {"path":"<todolist.json 的绝对路径>","op":{"op":"toggle","id":"m3a"}}
 ```
 
-宿主处理：解析 JSON → `op` 必须是一个操作对象 → 只接受 basename 为 `todolist.json` → 路径必须在会话工作区内（能拿到 `session.cwd` 时）→ `applyOpAndWrite`（读、校验、应用、原子写）→ 返回 `已保存 rev N` 或错误文本。面板失败时显示红色错误条并保持文件原样，重新读取由文件 watch 负责。
+宿主处理：解析 JSON → `op` 必须是一个操作对象 → 只接受 basename 为 `todolist.json` → 通过 `planCwd` 解析会话工作区（拿不到工作区时拒绝写入），并经 `realpath` 校验目标路径在工作区内（拦截符号链接越界）→ `applyOpAndWrite`（读、校验、应用、原子写）→ 返回 `已保存 rev N` 或错误文本。面板失败时显示红色错误条并保持文件原样，重新读取由文件 watch 负责。
 
 兼容：`{"path":"…","op":"toggle","id":"…"}` 这种把操作字段平铺在 `path` 旁边的旧形式也接受（面板遇到旧宿主时会自动改用这种形式重发一次）。
 
@@ -158,7 +158,7 @@
 | action | 作用 |
 |---|---|
 | `read` | 返回压缩文本（阶段 / 状态 / 截止 / id / 下一步），不吐整份 JSON |
-| `add` / `addChild` / `status` / `rename` / `due` / `remove` / `move` / `reorder` | 与面板同一套操作 |
+| `add` / `addChild` / `addGroup` / `status` / `rename` / `due` / `note` / `remove` / `move` / `reorder` / `reorderGroups` | 与面板同一套操作；`add` 支持 `groupId` / `order` / `after` / `due` / `note`，`addChild` 支持 `status`，`move` / `reorder` 支持 `groupId: null \| "__none" \| ""` 移回未分组 |
 | `settings` | `hideCompleted`、`notify`、`notifyWindow`、`style`、`material` |
 | `next` | 指定「下一步」（`id` 为空则恢复自动推断） |
 | `open` | `ui.openRequest + 1`，面板的常驻监听看到跳变就开页签 |

@@ -516,3 +516,32 @@ const cwd = exec.agent === undefined ? undefined : await ctx.workingDirectory.en
 
 **判断**：`CODE_OF_CONDUCT.md` 对个人插件是纯仪式感——不是许可、不是硬性要求，也没有被任何文档引用；GitHub 只是把它当"社区文件"展示。删掉后 Community Standards 会提示未配置，不影响 issue/PR/Release。
 **动作**：删除该文件；README/CONTRIBUTING 本来就没链接它，无需改引用。
+
+## 2026-11-22 · 安全、核心缺陷、并发与文档交叉验证修复
+
+**目标**：核验并补全 S1、F1–F10、C1–C10、D1–D4 修复，同时消除交叉验证中发现的并发版本检查回退（C6）、`add`/`move`/`reorderGroups` 序号重号（F8）与工具参数/面板输入/FLIP/文档同步问题。
+
+**改动**
+- `host/plan.js`：`applyOp` 新增 `renumberStage`，`add` / `move`（含跨阶段源与目标）与 `reorderGroups` 统一保持唯一连续 `1..N` 序号；`readPlanFile`（最多 2 次读）与 `repairPlanFile` 改为读前读后双 `stat`，不一致时用 `'stale'` 哨兵阻断 `writePlanFile` 盲覆，保留不汇报 `stat` 后端的 `undefined` 语义。
+- `index.js`：收紧 `checkArgs` 仅对 `groupId`/`due`/`note` 及 `next`/`addGroup` 的 `id` 放行 `null`，避免 `status`/`rename`/`remove`/`move` 等误传 `id: null` 绕过参数类型报错；参数描述补充 `"" / null`。
+- `client.js`：`SettingsScreen` 增加 `lastCommittedRef` 防止 `Enter` 后紧接着 `onBlur` 重复提交相同的 `notifyWindow`；`useRowFlip` 引入 `layoutKey`（页面/隐藏已完成/阶段与子项折叠），仅布局变化时刷新行坐标而不误播 FLIP 动画。
+- 文档与测试：同步 `README.en.md`（修断行）、`SPEC.md`（`planCwd` + `realpath` 边界、`groupId` 未分组规则、工具表）、`CHANGELOG.md`、`DEVLOG.md`；在 `tools/plan-store-test.mjs`、`tools/command-test.mjs`、`tools/tool-test.mjs` 中补齐对应单测。
+
+**验证**
+- `node --check index.js`、`node --check host/plan.js`、`node --check client.js` 通过。
+- `npm test` 四套测试全绿（`plan-store tests: 35 passed`、`command tests`、`session switch test`、`tool tests`、`skill test`、`client smoke check`）。
+- `npm pack --dry-run` 包含 `assets/icon-180.png`、`host/plan.js`、`index.js`、`client.js`（共 33 个文件）。
+
+**待真机确认**：DSH Desktop 真机环境下 `planCwd` 在 `/todo` 命令层的实际工作区解析、F3 合并窗口输入 `30`、F4/F5/F9 跨阶段与未分组拖拽手感及插入线、F7 连点队列、D2 `48px` 子项缩进（如需附新截图可重出 `docs/images/`）、C2/C7 通知取消与停用清理。
+
+## 2026-11-22 · 0.1.1：新增 Material Design 3 主题与复验遗留项收口
+
+**目标**：按复验报告收口遗留问题（`command-test` 联接清理 `ENOTEMPTY`、`24px` 抓手、独立 `.dsh-todo-insert` 行级插入条、版本升至 `0.1.1`），并新增 Google Material Design 3（`md3`）主题。
+
+**改动**
+- `tools/command-test.mjs`：先删工作区内 `escape` 目录联接再删 `outsideDir`，并为 `rm` 增加 `maxRetries: 3, retryDelay: 50`，消除 Windows 悬空联接导致的 `ENOTEMPTY`。
+- `client.js`：抓手与首列宽从 `20px` 提至 `24px`；移除行级 `inset box-shadow`，改为在 `ItemRow` 渲染绝对定位的 `.dsh-todo-insert[data-pos="before|after"]` 浮层条（零布局位移）；新增 `md3`（Material Design 3）主题样式、中英文文案、设置页卡片与 `normalizePlan` 支持。
+- `host/plan.js`、`index.js`、`package.json`、`SPEC.md`、`DESIGN.md`、`docs/AGENT.md`、`docs/COMPAT.md`、`CHANGELOG.md`：`STYLES` 与工具 `style` 枚举补充 `'md3'`，版本升为 `0.1.1`。
+- `tools/plan-store-test.mjs`、`tools/tool-test.mjs`、`tools/smoke-client.mjs`：补充 `md3` 主题与行级 `.dsh-todo-insert` 渲染断言。
+
+**验证**：见本轮 `node --check` 与 `npm test` 输出；真机仍待用户在 DSH 中切换 `Material Design` 主题及试拖确认。

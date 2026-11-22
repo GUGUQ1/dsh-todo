@@ -2,6 +2,25 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 组织，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.1.1] - 2026-11-22
+
+### 新增
+
+- 新增 **Material Design**（`md3`）外观主题：参考 Google Material Design 3（M3）规范，提供 `16px` 大圆角色调容器、胶囊型序号/模式/计数徽章与按钮、无硬分隔线的 `12px` 圆角行状态层，以及对应 `todolist settings style="md3"` 工具支持。
+
+### 安全
+
+- 路径校验改用 `basename(file) === 'todolist.json'`、`planCwd` 强制解析工作区（拿不到直接拒绝，fail-closed）以及 `realpath` 解析真实路径拦截工作区内符号链接 / 目录联接越界（S1）。
+
+### 修复
+
+- 修复助手侧 `todolist` 工具无法切回默认外观 `vivid` 的问题（F1），并补充 `addGroup`、`reorderGroups`、`note` 及 `add` 的 `groupId`/`order`/`after`/`due`/`note`、`addChild` 的 `status`、`reorder` 的 `groupId` 支持，同时收紧 `checkArgs` 对 `null` 参数的校验（F10）。
+- 修复 `repairPlan` 对未知字段与部分非法字段静默丢失而不写 `notes`、导致 `repairPlanFile` 不写盘的问题，并在 `readPlanFile` / `repairPlanFile` 读前读后双 `stat` 不一致时重试并在持续并发修改时返回 `stale` 哨兵避免跳过写前并发检查（F2、C6）。
+- 修复设置页「合并窗口」输入框受控值回弹、吞字及回车后失焦重复提交问题（F3）。
+- 修复跨阶段拖拽预览丢失、拖入「未分组」不生效、`add`/`move`/`reorder`/`reorderGroups` 序号冲突问题；将抓手命中宽度增至 `24px`，将行级插入线改为零布局位移的独立 `.dsh-todo-insert` 浮层条，并改善 `useRowFlip` 滞后闪烁与布局变化坐标刷新及双层 `onDrop` 冒泡问题（F4、F5、F8、F9、C5）。
+- 修复删除事项通知显示随机 ID 的问题、连续点击写入被静默丢弃的问题、`hideCompleted` 本地状态永久覆盖文件值的问题、关通知或关会话开关后已排队定时器仍触发的问题、多会话开关串台与路径缓存未重置、子项折叠缺少 `inert`、SVG 属性名及未引用代码残留（F6、F7、C1–C4、C7–C10）。
+- 修复中英文 README 末尾 `node:` 断行、子项缩进调至 `48px`、修正 `DESIGN.md`/`DECISIONS.md` 文案错位、`package.json` `files` 补充 `"assets"`，并同步 `SPEC.md`、`docs/COMPAT.md`；修复 `tools/command-test.mjs` Windows 悬空联接清理偶发 `ENOTEMPTY` 导致退出码非 0 的问题（D1–D4）。
+
 ## [0.1.0] - 2026-11-22
 
 首个公开版本。面板、写入通道、模型工具与通知链路都在真实会话里端到端验证过（子对话 8 步全通，5 条非法调用全部被拦且文件零改动）。

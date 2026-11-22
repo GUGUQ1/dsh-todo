@@ -78,6 +78,8 @@ window.__ModuleLoader__.load({
       'panel.style.calm.desc': '阶段标题不染色，只留一条发丝线；最干净的一种。',
       'panel.style.vivid': '灵动',
       'panel.style.vivid.desc': '阶段色更饱满，卡片左侧一条彩色导轨，进行中更抢眼，配轻微动效。',
+      'panel.style.md3': 'Material Design',
+      'panel.style.md3.desc': '',
       'panel.material': '高级材质',
       'panel.material.desc': '渐变、分层投影、毛玻璃与内高光。关掉只有纯色块，最省性能。',
       'panel.notify.nextTurn': '下一轮携带',
@@ -168,6 +170,8 @@ window.__ModuleLoader__.load({
       'panel.style.calm.desc': 'Stage headers stay plain with one hairline; the quietest look.',
       'panel.style.vivid': 'Vivid',
       'panel.style.vivid.desc': 'Fuller stage colours, a coloured rail down each card, a louder active row, plus small motion.',
+      'panel.style.md3': 'Material Design',
+      'panel.style.md3.desc': '',
       'panel.material': 'Advanced materials',
       'panel.material.desc': 'Gradients, layered shadows, frosted glass and an inner highlight. Off is flat and cheapest to render.',
       'panel.notify.nextTurn': 'Next turn',
@@ -292,15 +296,15 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-secondary);white-space:nowrap}
 .dsh-todo-stage-head[data-state="done"] .dsh-todo-stage-count{color:var(--dsw-alias-state-success-primary)}
 .dsh-todo-item-block+.dsh-todo-item-block{border-top:1px solid var(--dsw-alias-border-l2)}
-.dsh-todo-row{position:relative;display:grid;grid-template-columns:10px 16px minmax(0,1fr) auto;gap:8px;
+.dsh-todo-row{position:relative;display:grid;grid-template-columns:24px 16px minmax(0,1fr) auto;gap:8px;
   align-items:start;padding:7px 10px;outline:none;isolation:isolate}
-.dsh-todo-row[data-child]{grid-template-columns:16px minmax(0,1fr) auto}
-.dsh-todo-grip{display:flex;align-items:center;justify-content:center;width:10px;height:22px;
-  color:var(--dsw-alias-label-tertiary);opacity:0;cursor:grab;border-radius:3px}
+.dsh-todo-row[data-child]{grid-template-columns:16px minmax(0,1fr) auto;padding-left:48px}
+.dsh-todo-grip{display:flex;align-items:center;justify-content:center;width:24px;height:22px;
+  color:var(--dsw-alias-label-tertiary);opacity:.3;cursor:grab;border-radius:3px}
 .dsh-todo-grip:active{cursor:grabbing}
-.dsh-todo-row:hover .dsh-todo-grip,.dsh-todo-row:focus-visible .dsh-todo-grip{opacity:.75}
-.dsh-todo-grip.is-visible{opacity:.45}
-.dsh-todo-stage-head:hover .dsh-todo-grip.is-visible{opacity:.8}
+.dsh-todo-row:hover .dsh-todo-grip,.dsh-todo-row:focus-visible .dsh-todo-grip{opacity:.85}
+.dsh-todo-grip.is-visible{opacity:.5}
+.dsh-todo-stage-head:hover .dsh-todo-grip.is-visible{opacity:.85}
 .dsh-todo-row:hover{background:var(--dsw-alias-interactive-bg-hover);--dsh-todo-row-bg:var(--dsw-alias-interactive-bg-hover)}
 .dsh-todo-row:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}
 /* "In progress" is an active signal, not a stage property: one amber mark that
@@ -361,7 +365,7 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2);
   border:1px solid var(--dsw-alias-border-l2);border-radius:6px;outline:none}
 .dsh-todo-input:focus{border-color:var(--dsw-alias-brand-primary)}
-.dsh-todo-add{margin:4px 10px 7px 34px}
+.dsh-todo-add{margin:4px 10px 7px 48px}
 .dsh-todo-foot{margin:22px 4px 0;font-size:11px;letter-spacing:.02em;
   color:var(--dsw-alias-label-tertiary)}
 .dsh-todo-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -394,16 +398,13 @@ window.__ModuleLoader__.load({
 .dsh-todo-setting-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 2px 4px}
 .dsh-todo-setting-unit{font-size:11px;color:var(--dsw-alias-label-tertiary)}
 .dsh-todo-row[data-dragging]{opacity:.45}
-.dsh-todo-row[data-drop="before"]{box-shadow:inset 0 2px 0 var(--dsh-todo-accent,var(--dsw-alias-brand-primary))}
-.dsh-todo-row[data-drop="after"]{box-shadow:inset 0 -2px 0 var(--dsh-todo-accent,var(--dsw-alias-brand-primary))}
-.dsh-todo-row[data-drop]::after{content:'';position:absolute;left:2px;width:5px;height:5px;border-radius:50%;
-  background:var(--dsh-todo-accent,var(--dsw-alias-brand-primary))}
-.dsh-todo-row[data-drop="before"]::after{top:-3px}
-.dsh-todo-row[data-drop="after"]::after{bottom:-3px}
-.dsh-todo-insert{position:relative;height:2px;margin:3px 10px;border-radius:2px;
-  background:var(--dsh-todo-accent,var(--dsw-alias-brand-primary))}
-.dsh-todo-insert::before{content:'';position:absolute;left:-4px;top:-1px;width:5px;height:5px;
+.dsh-todo-insert{position:relative;height:3px;margin:4px 10px;border-radius:2px;
+  background:var(--dsh-todo-accent,var(--dsw-alias-brand-primary));pointer-events:none}
+.dsh-todo-insert::before{content:'';position:absolute;left:-4px;top:-2px;width:7px;height:7px;
   border-radius:50%;background:inherit}
+.dsh-todo-insert[data-pos]{position:absolute;left:10px;right:10px;margin:0;z-index:3}
+.dsh-todo-insert[data-pos="before"]{top:-1.5px}
+.dsh-todo-insert[data-pos="after"]{bottom:-1.5px}
 /* Motion: short and skipped entirely when the OS asks for less motion. */
 @keyframes dsh-todo-ring{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
 @keyframes dsh-todo-tick{0%{stroke-dashoffset:12}100%{stroke-dashoffset:0}}
@@ -484,6 +485,119 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-secondary)}
 .dsh-todo-setting-hint{margin:10px 2px 0;font-size:11px;line-height:1.6;
   color:var(--dsw-alias-label-tertiary)}
+/* md3: Google Material Design 3 — pastel tonal stage containers, white rounded item
+   cards, M3 lavender pills, warm amber active cards, and child guide line. */
+.dsh-todo[data-style="md3"]{
+  --dsh-todo-m3-primary:color-mix(in srgb,hsl(265 62% 50%) 80%,var(--dsw-alias-label-primary));
+  --dsh-todo-m3-lavender:color-mix(in srgb,hsl(265 72% 62%) 18%,var(--dsw-alias-bg-base));
+  background:color-mix(in srgb,hsl(265 72% 62%) 3%,var(--dsw-alias-bg-base));
+  padding:12px 10px 18px}
+[data-style="md3"] .dsh-todo-count{
+  padding:3px 10px;border-radius:999px;font-weight:600;
+  background:var(--dsh-todo-m3-lavender);color:var(--dsh-todo-m3-primary)}
+[data-style="md3"] .dsh-todo-stage{
+  --dsh-todo-m3-tone:hsl(var(--dsh-todo-hue,212) 82% 52%);
+  --dsh-todo-m3-ink:color-mix(in srgb,hsl(var(--dsh-todo-hue,212) 78% 45%) 82%,var(--dsw-alias-label-primary));
+  margin-top:14px;border-radius:22px;padding-bottom:2px;
+  background:color-mix(in srgb,var(--dsh-todo-m3-tone) 10%,var(--dsw-alias-bg-base));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--dsh-todo-m3-tone) 22%,transparent)}
+[data-style="md3"][data-material="on"] .dsh-todo-stage{
+  background-image:none;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--dsh-todo-m3-tone) 24%,transparent),
+    0 2px 6px -2px color-mix(in srgb,var(--dsh-todo-m3-tone) 18%,transparent)}
+[data-style="md3"] .dsh-todo-stage-head{
+  padding:11px 12px 9px;border-bottom:0;
+  background:color-mix(in srgb,var(--dsh-todo-m3-tone) 4%,transparent)}
+[data-style="md3"] .dsh-todo-index{
+  font-size:12.5px;font-weight:700;color:var(--dsh-todo-m3-ink)}
+[data-style="md3"] .dsh-todo-kicker{font-size:13px;font-weight:650;letter-spacing:.01em}
+[data-style="md3"] .dsh-todo-mode{
+  padding:1px 8px;border-radius:999px;font-size:10px;font-weight:500;
+  color:var(--dsh-todo-m3-ink);
+  background:color-mix(in srgb,var(--dsh-todo-m3-tone) 12%,var(--dsw-alias-bg-base));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dsh-todo-m3-tone) 22%,transparent)}
+[data-style="md3"] .dsh-todo-stage-count{
+  padding:2px 9px;border-radius:999px;font-weight:600;
+  background:var(--dsw-alias-bg-base);color:var(--dsh-todo-m3-ink);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--dsh-todo-m3-tone) 20%,transparent)}
+[data-style="md3"] .dsh-todo-stage-head[data-state="done"] .dsh-todo-stage-count{
+  color:var(--dsw-alias-state-success-primary);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--dsw-alias-state-success-primary) 28%,transparent)}
+[data-style="md3"] .dsh-todo-stage-focus{
+  display:flex;flex-direction:column;gap:6px;padding:0 10px 6px;border-bottom:0;background:transparent}
+[data-style="md3"] .dsh-todo-focus-row{
+  align-items:center;gap:8px;padding:7px 10px;border-radius:14px}
+[data-style="md3"] .dsh-todo-focus-row[data-focus-kind="next"]{
+  background:color-mix(in srgb,var(--dsh-todo-m3-tone) 16%,var(--dsw-alias-bg-base));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dsh-todo-m3-tone) 24%,transparent)}
+[data-style="md3"] .dsh-todo-focus-row[data-focus-kind="next"] .dsh-todo-focus-label{
+  flex:0 0 auto;padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:600;letter-spacing:0;
+  background:var(--dsh-todo-m3-tone);color:#ffffff}
+[data-style="md3"] .dsh-todo-focus-row[data-focus-kind="active"]{
+  background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 16%,var(--dsw-alias-bg-base));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dsw-alias-state-warn-primary) 30%,transparent)}
+[data-style="md3"] .dsh-todo-focus-row[data-focus-kind="active"] .dsh-todo-focus-label{
+  flex:0 0 auto;padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:600;letter-spacing:0;
+  background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 32%,var(--dsw-alias-bg-base));
+  color:var(--dsw-alias-state-warn-label)}
+[data-style="md3"] .dsh-todo-focus-row[data-focus-kind="active"] .dsh-todo-focus-dot{margin-right:0}
+[data-style="md3"] .dsh-todo-item-block+.dsh-todo-item-block{border-top:0}
+[data-style="md3"] .dsh-todo-row{
+  margin:6px 10px;padding:9px 10px;border-radius:14px;background:var(--dsw-alias-bg-base);
+  box-shadow:0 1px 2px color-mix(in srgb,var(--dsw-alias-label-primary) 4%,transparent),
+    0 0 0 1px color-mix(in srgb,var(--dsh-todo-m3-tone) 10%,transparent)}
+[data-style="md3"] .dsh-todo-row:hover{
+  background:color-mix(in srgb,var(--dsh-todo-m3-tone) 5%,var(--dsw-alias-bg-base))}
+[data-style="md3"] .dsh-todo-row[data-progress]{
+  background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 16%,var(--dsw-alias-bg-base));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--dsw-alias-state-warn-primary) 48%,transparent)}
+[data-style="md3"] .dsh-todo-row[data-progress]::before{display:none}
+[data-style="md3"] .dsh-todo-children .dsh-todo-collapse-inner{
+  margin:0 10px 4px 36px;padding-left:12px;
+  border-left:2px solid color-mix(in srgb,var(--dsh-todo-m3-tone) 42%,transparent)}
+[data-style="md3"] .dsh-todo-row[data-child]{
+  margin:4px 0;padding:7px 10px;border-radius:12px;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--dsh-todo-m3-tone) 18%,transparent)}
+[data-style="md3"] .dsh-todo-chip{
+  padding:1px 9px;border-radius:999px;font-weight:600;
+  background:var(--dsh-todo-m3-lavender);color:var(--dsh-todo-m3-primary)}
+[data-style="md3"] .dsh-todo-chip[data-tone="warn"]{
+  background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
+[data-style="md3"] .dsh-todo-chip[data-tone="danger"]{
+  background:var(--dsw-alias-state-error-secondary);color:var(--dsw-alias-state-error-primary)}
+[data-style="md3"] .dsh-todo-date,[data-style="md3"] .dsh-todo-btn,
+[data-style="md3"] .dsh-todo-link{border-radius:999px}
+[data-style="md3"] .dsh-todo-empty-stage{
+  margin:6px 10px;padding:12px !important;border-radius:14px;text-align:center;
+  background:var(--dsw-alias-bg-base);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--dsh-todo-m3-tone) 10%,transparent)}
+[data-style="md3"] .dsh-todo-add{margin:6px 10px 10px}
+[data-style="md3"] .dsh-todo-add>.dsh-todo-link{
+  display:block;width:100%;text-align:center;padding:6px 12px;border-radius:14px;font-weight:500;
+  color:var(--dsh-todo-m3-ink);
+  background:color-mix(in srgb,var(--dsw-alias-bg-base) 75%,transparent);
+  border:1.5px dashed color-mix(in srgb,var(--dsh-todo-m3-tone) 34%,transparent)}
+[data-style="md3"] .dsh-todo-add>.dsh-todo-link:hover{
+  background:var(--dsw-alias-bg-base);border-color:var(--dsh-todo-m3-tone)}
+[data-style="md3"] .dsh-todo-add-stage{margin-top:14px !important;display:flex;justify-content:flex-end}
+[data-style="md3"] .dsh-todo-add-stage>.dsh-todo-link{
+  padding:7px 16px;border-radius:16px;font-size:12.5px;font-weight:600;
+  background:var(--dsh-todo-m3-lavender);color:var(--dsh-todo-m3-primary);
+  box-shadow:0 2px 8px -2px color-mix(in srgb,var(--dsh-todo-m3-primary) 26%,transparent)}
+[data-style="md3"] .dsh-todo-input{border-radius:12px;padding:5px 11px}
+[data-style="md3"] .dsh-todo-action-button{
+  border-radius:999px;border:0;padding:3px 18px;font-weight:600;
+  background:var(--dsh-todo-m3-lavender);color:var(--dsh-todo-m3-primary)}
+[data-style="md3"] .dsh-todo-action-button:hover{
+  background:color-mix(in srgb,hsl(265 72% 62%) 26%,var(--dsw-alias-bg-base))}
+[data-style="md3"] .dsh-todo-choice{
+  border-radius:16px;padding:10px 14px;
+  background:color-mix(in srgb,var(--dsw-alias-label-primary) 3%,var(--dsw-alias-bg-base))}
+[data-style="md3"] .dsh-todo-choice[aria-pressed="true"]{
+  background:var(--dsh-todo-m3-lavender);
+  box-shadow:0 0 0 1px var(--dsh-todo-m3-primary);border-color:transparent}
+[data-style="md3"] .dsh-todo-movebar,[data-style="md3"] .dsh-todo-offline,
+[data-style="md3"] .dsh-todo-problem{border-radius:18px}
 ${SWITCH_STYLE}
 `
 
@@ -523,8 +637,8 @@ ${SWITCH_STYLE}
         h('rect', { x: 7.75, y: 4.9, width: 9, height: 1.7, rx: 0.85, fill: 'currentColor', opacity: 0.55 }),
         h('path', {
           d: 'M3.4 10.4l1.6 1.6 2.5-2.6',
-          fill: 'none', stroke: 'currentColor', 'stroke-width': 1.5,
-          'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+          fill: 'none', stroke: 'currentColor', strokeWidth: 1.5,
+          strokeLinecap: 'round', strokeLinejoin: 'round',
         }),
         h('rect', { x: 7.75, y: 10.1, width: 9, height: 1.7, rx: 0.85, fill: 'currentColor', opacity: 0.35 }),
         h('rect', { x: 3, y: 15, width: 3, height: 3, rx: 0.8, fill: 'currentColor', opacity: 0.2 }),
@@ -681,7 +795,7 @@ ${SWITCH_STYLE}
       } catch {
         // Storage unavailable: the switch works for this page load only.
       }
-      for (const listener of sessionSwitch.listeners) listener(value === true)
+      for (const listener of sessionSwitch.listeners) listener(value === true, sessionId)
     }
 
     /**
@@ -734,7 +848,7 @@ ${SWITCH_STYLE}
           openRequest: Number.isInteger(parsed.ui?.openRequest) ? parsed.ui.openRequest : 0,
           notify: ['next-turn', 'wake', 'off'].includes(parsed.ui?.notify) ? parsed.ui.notify : 'next-turn',
           notifyWindow: Number.isInteger(parsed.ui?.notifyWindow) ? parsed.ui.notifyWindow : 8,
-          style: ['paper', 'calm', 'vivid'].includes(parsed.ui?.style) ? parsed.ui.style : 'vivid',
+          style: ['paper', 'calm', 'vivid', 'md3'].includes(parsed.ui?.style) ? parsed.ui.style : 'vivid',
           material: typeof parsed.ui?.material === 'boolean' ? parsed.ui.material : true,
           next: typeof parsed.ui?.next === 'string' ? parsed.ui.next : null,
           groups, items,
@@ -783,7 +897,7 @@ ${SWITCH_STYLE}
         }
       }
 
-      const byOrder = (left, right) => left.order - right.order
+      const byOrder = (left, right) => (left.order - right.order) || String(left.id).localeCompare(String(right.id))
 
       /** Two-digit index for a stage, as the editorial rail numbers them. */
       const indexLabel = index => String(index + 1).padStart(2, '0')
@@ -813,8 +927,8 @@ ${SWITCH_STYLE}
         const size = props.size ?? 12
         const common = { width: size, height: size, viewBox: '0 0 14 14', 'aria-hidden': true, style: { display: 'block' } }
         const stroke = {
-          fill: 'none', stroke: 'currentColor', 'stroke-width': 1.25,
-          'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+          fill: 'none', stroke: 'currentColor', strokeWidth: 1.25,
+          strokeLinecap: 'round', strokeLinejoin: 'round',
         }
         if (props.name === 'plus') return h('svg', common, h('path', { d: 'M7 2.5v9M2.5 7h9', ...stroke }))
         if (props.name === 'close') return h('svg', common, h('path', { d: 'M3.5 3.5l7 7M10.5 3.5l-7 7', ...stroke }))
@@ -903,12 +1017,12 @@ ${SWITCH_STYLE}
                 h('circle', { key: 'c', className: 'dsh-todo-check-ring', cx: 7, cy: 7, r: 6.3, fill: ink }),
                 h('path', {
                   key: 't', className: 'dsh-todo-check-tick', d: 'M4.2 7.2l1.9 1.9 3.7-3.9', fill: 'none',
-                  stroke: 'var(--dsw-alias-label-primary-inverted)', 'stroke-width': 1.3,
-                  'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+                  stroke: 'var(--dsw-alias-label-primary-inverted)', strokeWidth: 1.3,
+                  strokeLinecap: 'round', strokeLinejoin: 'round',
                 }),
               ]
               : [
-                h('circle', { key: 'c', cx: 7, cy: 7, r: 5.6, fill: 'none', stroke: ink, 'stroke-width': 1.4 }),
+                h('circle', { key: 'c', cx: 7, cy: 7, r: 5.6, fill: 'none', stroke: ink, strokeWidth: 1.4 }),
                 props.status === 'in_progress'
                   ? h('circle', { key: 'd', cx: 7, cy: 7, r: 2.1, fill: ink })
                   : null,
@@ -997,6 +1111,10 @@ ${SWITCH_STYLE}
             title: item.title,
           }, item.title)
 
+        const dropSide = view.dropTarget?.kind === 'item' && view.dropTarget.id === item.id
+          ? (view.dropTarget.before ? 'before' : 'after')
+          : undefined
+
         return h('div', {
           className: depth === 0 ? 'dsh-todo-item-block' : undefined,
           'data-removing': view.removing === item.id ? '1' : undefined,
@@ -1008,15 +1126,13 @@ ${SWITCH_STYLE}
             'data-child': depth === 1 ? '' : undefined,
             'data-dragging': view.drag?.kind === 'item' && view.drag.id === item.id ? '' : undefined,
             'data-flash': Array.isArray(view.flashIds) && view.flashIds.includes(item.id) ? 'done' : undefined,
-            'data-drop': view.dropTarget?.kind === 'item' && view.dropTarget.id === item.id
-              ? (view.dropTarget.before ? 'before' : 'after')
-              : undefined,
+            'data-drop': dropSide,
             onDragOver: (event) => { if (depth === 0) handlers.dragOver('item', item.id, event) },
-            onDrop: (event) => { if (depth === 0) handlers.drop(event) },
+            onDrop: (event) => { if (depth === 0) { event.stopPropagation(); handlers.drop(event) } },
             onKeyDown: rowKeys(item, handlers),
             tabIndex: 0,
-            style: depth === 0 ? undefined : { paddingLeft: 32 },
           },
+            dropSide === undefined ? null : h('div', { className: 'dsh-todo-insert', 'data-pos': dropSide, 'aria-hidden': true }),
             h('span', { key: `fx-${item.status}`, className: 'dsh-todo-fx', 'data-kind': item.status, 'aria-hidden': true }),
             depth === 0 ? h('span', {
               className: 'dsh-todo-grip',
@@ -1099,6 +1215,7 @@ ${SWITCH_STYLE}
           children.length === 0 ? null : h('div', {
             className: 'dsh-todo-children dsh-todo-collapse',
             'data-open': folded ? undefined : '',
+            inert: folded ? '' : undefined,
           },
             h('div', { className: 'dsh-todo-collapse-inner' },
               children.map(child => h(ItemRow, {
@@ -1107,7 +1224,7 @@ ${SWITCH_STYLE}
             ),
           ),
           addingChild
-            ? h('div', { style: { paddingLeft: 32, margin: '2px 0 4px' } },
+            ? h('div', { style: { paddingLeft: 48, margin: '2px 0 4px' } },
               h(TextInput, {
                 value: view.adding.value,
                 label: t('panel.addChild'),
@@ -1155,7 +1272,7 @@ ${SWITCH_STYLE}
             }),
           )
         }
-        return h('div', { style: { marginTop: 26 } },
+        return h('div', { className: 'dsh-todo-add-stage', style: { marginTop: 26 } },
           h('button', {
             type: 'button', className: 'dsh-todo-link', 'data-action': 'add-stage',
             onClick: () => { props.handlers.startAddStage() },
@@ -1165,12 +1282,6 @@ ${SWITCH_STYLE}
 
       /** Stage hues, one per rail position; a stage keeps its hue as the list grows. */
       const HUES = [212, 265, 330, 24, 152, 46]
-
-      /** The stage title an item belongs to, for the focus line. */
-      function stageTitleOf(plan, item) {
-        const group = plan.groups.find(candidate => candidate.id === item.groupId)
-        return group === undefined ? '' : group.title
-      }
 
       /**
        * Which item is next: the user's explicit choice while it is still open,
@@ -1204,19 +1315,23 @@ ${SWITCH_STYLE}
         const done = byId.doneByGroup(group.id)
         const total = byId.totalByGroup(group.id)
         const collapsed = view.collapsed?.includes(group.id) === true
+        const isMoveTarget = view.pendingMove?.kind === 'item'
+          && (view.pendingMove.groupId ?? '__none') === group.id
+        const pending = isMoveTarget ? view.pendingMove.ids : undefined
+        const ordered = pending === undefined
+          ? (view.pendingMove?.kind === 'item' && (view.pendingMove.groupId ?? '__none') !== group.id
+            ? rows.filter(row => row.id !== view.pendingMove.movedId)
+            : rows)
+          : pending
+            .map(id => byId.map.get(id))
+            .filter(row => row !== undefined && (!view.hide || row.status !== 'completed'))
         const state = total > 0 && done === total
           ? 'done'
-          : rows.some(item => item.status === 'in_progress') ? 'active' : 'idle'
-        const pending = view.pendingMove?.kind === 'item' && view.pendingMove.groupId === group.id
-          ? view.pendingMove.ids
-          : undefined
-        const ordered = pending === undefined
-          ? rows
-          : pending.map(id => rows.find(row => row.id === id)).filter(row => row !== undefined)
+          : ordered.some(item => item.status === 'in_progress') ? 'active' : 'idle'
         // "In progress" may cover several items (parallel work, set by the
         // agent); "next" is a single pointer. Never show the same row twice.
-        const activeRows = rows.filter(row => row.status === 'in_progress')
-        const nextRow = rows.find(row => row.id === view.nextId)
+        const activeRows = ordered.filter(row => row.status === 'in_progress')
+        const nextRow = ordered.find(row => row.id === view.nextId)
         const nextShown = nextRow !== undefined && !activeRows.some(row => row.id === nextRow.id)
         const appendHere = view.dropTarget?.kind === 'stage' && view.dropTarget.id === group.id
         const dropHere = view.dropTarget?.kind === 'group' && view.dropTarget.id === group.id
@@ -1233,7 +1348,7 @@ ${SWITCH_STYLE}
             'data-state': state,
             'aria-expanded': !collapsed,
             onDragOver: (event) => { handlers.dragOver('group', group.id, event) },
-            onDrop: (event) => { handlers.drop(event) },
+            onDrop: (event) => { event.stopPropagation(); handlers.drop(event) },
             onClick: () => { handlers.toggleGroup(group.id) },
           },
             h('span', {
@@ -1251,7 +1366,7 @@ ${SWITCH_STYLE}
             h('span', { className: 'dsh-todo-stage-count dsh-todo-mono' }, done + '/' + total),
           ),
           activeRows.length === 0 && !nextShown ? null : h('div', { className: 'dsh-todo-stage-focus' },
-            activeRows.length === 0 ? null : h('div', { className: 'dsh-todo-focus-row' },
+            activeRows.length === 0 ? null : h('div', { className: 'dsh-todo-focus-row', 'data-focus-kind': 'active' },
               h('span', { className: 'dsh-todo-focus-label' }, t('panel.inProgress')),
               h('span', { className: 'dsh-todo-focus-dot' }),
               h('span', { className: 'dsh-todo-focus-text' }, activeRows[0].title),
@@ -1259,7 +1374,7 @@ ${SWITCH_STYLE}
                 ? h('span', { className: 'dsh-todo-focus-more dsh-todo-mono' }, '+' + (activeRows.length - 1))
                 : null,
             ),
-            nextShown ? h('div', { className: 'dsh-todo-focus-row' },
+            nextShown ? h('div', { className: 'dsh-todo-focus-row', 'data-focus-kind': 'next' },
               h('span', { className: 'dsh-todo-focus-label' }, t('panel.next')),
               h('span', { className: 'dsh-todo-focus-text' }, nextRow.title),
             ) : null,
@@ -1270,12 +1385,13 @@ ${SWITCH_STYLE}
                 className: 'dsh-todo-items',
                 inert: collapsed ? '' : undefined,
                 onDragOver: (event) => { handlers.dragOver('stage', group.id, event) },
-                onDrop: (event) => { handlers.drop(event) },
+                onDrop: (event) => { event.stopPropagation(); handlers.drop(event) },
               },
             empty
               ? (appendHere
                 ? h('div', { className: 'dsh-todo-insert' })
                 : h('div', {
+                  className: 'dsh-todo-empty-stage',
                   style: {
                     padding: '2px 6px 2px 22px', fontSize: 11,
                     color: 'var(--dsw-alias-label-tertiary)',
@@ -1295,9 +1411,10 @@ ${SWITCH_STYLE}
       /** The centred empty / error screen. */
       /** Panel looks offered by the settings page, in display order. */
       const STYLE_MODES = [
+        { style: 'vivid', key: 'vivid' },
+        { style: 'md3', key: 'md3' },
         { style: 'paper', key: 'paper' },
         { style: 'calm', key: 'calm' },
-        { style: 'vivid', key: 'vivid' },
       ]
 
       /** Notify modes offered by the settings page, with their copy keys. */
@@ -1310,6 +1427,30 @@ ${SWITCH_STYLE}
       /** The panel's own settings page. */
       function SettingsScreen(props) {
         const plan = props.state.plan
+        const savedWindow = String(plan.notifyWindow ?? 8)
+        const [windowDraft, setWindowDraft] = React.useState(savedWindow)
+        const [windowError, setWindowError] = React.useState(undefined)
+        const lastCommittedRef = React.useRef(plan.notifyWindow ?? 8)
+        React.useEffect(() => {
+          const current = plan.notifyWindow ?? 8
+          lastCommittedRef.current = current
+          setWindowDraft(String(current))
+          setWindowError(undefined)
+        }, [plan.notifyWindow])
+        const commitWindow = () => {
+          const trimmed = String(windowDraft).trim()
+          const value = Number(trimmed)
+          if (trimmed === '' || !Number.isInteger(value) || value < 1 || value > 600) {
+            setWindowError('合并窗口必须是 1..600 的整数（秒）')
+            setWindowDraft(savedWindow)
+            return
+          }
+          setWindowError(undefined)
+          if (value !== lastCommittedRef.current) {
+            lastCommittedRef.current = value
+            props.handlers.setNotifyWindow(value)
+          }
+        }
         return h('div', {
           className: 'dsh-todo',
           'data-style': plan.style ?? 'vivid',
@@ -1323,23 +1464,25 @@ ${SWITCH_STYLE}
             }),
             h('span', { className: 'dsh-todo-title' }, t('panel.settings')),
           ),
-          h('div', { className: 'dsh-todo-rule' }),
           h('div', { className: 'dsh-todo-setting' },
             h('div', { className: 'dsh-todo-setting-title' }, t('panel.appearance')),
-            STYLE_MODES.map(entry => h('button', {
-              key: entry.style,
-              type: 'button',
-              className: 'dsh-todo-choice',
-              'data-action': 'style-' + entry.style,
-              'aria-pressed': (plan.style ?? 'vivid') === entry.style,
-              onClick: () => { props.handlers.setStyle(entry.style) },
-            },
-              h('span', { className: 'dsh-todo-choice-head' },
-                h('span', { className: 'dsh-todo-choice-title' }, t('panel.style.' + entry.key)),
-                h('span', { className: 'dsh-todo-choice-mark' }, (plan.style ?? 'vivid') === entry.style ? '●' : ''),
-              ),
-              h('span', { className: 'dsh-todo-choice-desc' }, t('panel.style.' + entry.key + '.desc')),
-            )),
+            STYLE_MODES.map(entry => {
+              const desc = t('panel.style.' + entry.key + '.desc')
+              return h('button', {
+                key: entry.style,
+                type: 'button',
+                className: 'dsh-todo-choice',
+                'data-action': 'style-' + entry.style,
+                'aria-pressed': (plan.style ?? 'vivid') === entry.style,
+                onClick: () => { props.handlers.setStyle(entry.style) },
+              },
+                h('span', { className: 'dsh-todo-choice-head' },
+                  h('span', { className: 'dsh-todo-choice-title' }, t('panel.style.' + entry.key)),
+                  h('span', { className: 'dsh-todo-choice-mark' }, (plan.style ?? 'vivid') === entry.style ? '●' : ''),
+                ),
+                desc === '' ? null : h('span', { className: 'dsh-todo-choice-desc' }, desc),
+              )
+            }),
             h('div', { className: 'dsh-todo-setting-row' },
               h('span', { className: 'dsh-todo-setting-title', style: { marginBottom: 0 } }, t('panel.material')),
               h('button', {
@@ -1378,11 +1521,21 @@ ${SWITCH_STYLE}
                 type: 'number',
                 min: 1,
                 max: 600,
-                value: plan.notifyWindow ?? 8,
+                value: windowDraft,
                 'aria-label': t('panel.notifyWindow'),
                 onChange: (event) => {
-                  const value = Number(event.target.value)
-                  if (Number.isInteger(value) && value >= 1 && value <= 600) props.handlers.setNotifyWindow(value)
+                  lastCommittedRef.current = plan.notifyWindow ?? 8
+                  setWindowDraft(event.target.value)
+                  setWindowError(undefined)
+                },
+                onBlur: commitWindow,
+                onKeyDown: (event) => {
+                  if (event.key === 'Enter') { event.preventDefault(); commitWindow() }
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    setWindowDraft(savedWindow)
+                    setWindowError(undefined)
+                  }
                 },
                 style: { width: 76 },
               }),
@@ -1390,7 +1543,7 @@ ${SWITCH_STYLE}
             ),
             h('p', { className: 'dsh-todo-setting-hint' }, t('panel.notifyWindow.desc')),
           ),
-          h(ErrorBar, { message: props.view?.error }),
+          h(ErrorBar, { message: windowError ?? props.view?.error }),
         )
       }
 
@@ -1413,8 +1566,8 @@ ${SWITCH_STYLE}
       /** A thin line-art checklist for the empty state. */
       function EmptyGlyph() {
         const stroke = {
-          fill: 'none', stroke: 'currentColor', 'stroke-width': 1.1,
-          'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+          fill: 'none', stroke: 'currentColor', strokeWidth: 1.1,
+          strokeLinecap: 'round', strokeLinejoin: 'round',
         }
         return h('svg', { width: 40, height: 40, viewBox: '0 0 40 40', 'aria-hidden': true },
           h('rect', { x: 7, y: 6, width: 26, height: 28, rx: 3, ...stroke }),
@@ -1510,12 +1663,16 @@ ${SWITCH_STYLE}
        * invert the delta it just jumped, then let it play back to zero (FLIP).
        * Rows are found by `data-item`, so a move between stages animates too.
        */
-      function useRowFlip(rootRef) {
+      function useRowFlip(rootRef, orderKey, layoutKey, isDragging) {
         const previous = React.useRef(new Map())
+        const previousOrderKey = React.useRef(orderKey)
         const first = React.useRef(true)
         React.useLayoutEffect(() => {
+          if (isDragging) return
           const root = rootRef.current
           if (!root) return
+          const orderChanged = previousOrderKey.current !== orderKey
+          previousOrderKey.current = orderKey
           const reduced = typeof window !== 'undefined' && window.matchMedia
             && window.matchMedia('(prefers-reduced-motion: reduce)').matches
           const next = new Map()
@@ -1524,7 +1681,7 @@ ${SWITCH_STYLE}
             const top = node.getBoundingClientRect().top
             next.set(id, top)
             const before = previous.current.get(id)
-            if (before === undefined || Math.abs(before - top) < 1) continue
+            if (!orderChanged || before === undefined || Math.abs(before - top) < 1) continue
             if (first.current || reduced) continue
             node.style.transition = 'none'
             node.style.transform = `translateY(${before - top}px)`
@@ -1534,14 +1691,19 @@ ${SWITCH_STYLE}
           }
           previous.current = next
           first.current = false
-        })
+        }, [orderKey, layoutKey, isDragging])
       }
 
       function PlanPanel(props) {
         const { state, handlers } = props
         const view = props.view ?? {}
         const rootRef = React.useRef(null)
-        useRowFlip(rootRef)
+        const orderKey = state.kind === 'ready'
+          ? state.plan.items.map(item => `${item.id}:${item.groupId ?? ''}:${item.order}`).join('|')
+            + '||' + (view.pendingMove?.ids?.join(',') ?? '')
+          : ''
+        const layoutKey = `${view.page ?? 'plan'}|${Boolean(view.hideCompleted ?? (state.kind === 'ready' ? state.plan.hideCompleted : false))}|${(view.collapsed ?? []).join(',')}|${(view.foldedChildren ?? []).join(',')}`
+        useRowFlip(rootRef, orderKey, layoutKey, view.drag !== undefined)
         if (view.page === 'settings' && state.kind === 'ready') {
           return h(SettingsScreen, { state, handlers, view })
         }
@@ -1584,13 +1746,15 @@ ${SWITCH_STYLE}
           totalByGroup: groupId => plan.items.filter(item => (item.groupId ?? '__none') === groupId).length,
           doneByGroup: groupId => plan.items.filter(item => (item.groupId ?? '__none') === groupId && item.status === 'completed').length,
         }
+        const showUngrouped = ungrouped.length > 0
+          || (view.pendingMove?.kind === 'item' && (view.pendingMove.groupId ?? '__none') === '__none')
         const sections = [
           ...groups.map((group, index) => ({
             group,
             index,
             rows: visible(plan.items.filter(item => item.groupId === group.id).sort(byOrder)),
           })),
-          ...(ungrouped.length === 0 ? [] : [{
+          ...(!showUngrouped ? [] : [{
             group: { id: '__none', title: t('panel.stage'), mode: 'free' },
             index: groups.length,
             rows: visible(ungrouped.sort(byOrder)),
@@ -1624,7 +1788,6 @@ ${SWITCH_STYLE}
               })
               : null,
           ),
-          h('div', { className: 'dsh-todo-rule' }),
           view.enabled === false
             ? h('div', { className: 'dsh-todo-offline', role: 'alert' },
               h('span', { className: 'dsh-todo-offline-mark' }, '!'),
@@ -1677,8 +1840,16 @@ ${SWITCH_STYLE}
         React.useEffect(() => {
           if (typeof sessionId !== 'string' || sessionId === '') return undefined
           setEnabled(getSessionSwitch(sessionId))
-          return subscribeSessionSwitch(setEnabled)
+          return subscribeSessionSwitch((value, changedId) => {
+            if (changedId === undefined || changedId === sessionId) setEnabled(value)
+          })
         }, [sessionId])
+
+        const readyHide = state.kind === 'ready' ? state.plan.hideCompleted : undefined
+        const readyRev = state.kind === 'ready' ? state.plan.rev : undefined
+        React.useEffect(() => {
+          setHideCompleted(undefined)
+        }, [readyHide, readyRev])
 
         // The completion animation belongs to a real state change, not to a
         // mount: reordering rows or leaving the settings page remounts nodes, and
@@ -1841,48 +2012,59 @@ ${SWITCH_STYLE}
           ? (outcome.error?.message ?? '命令调用失败')
           : (outcome?.value?.kind === 'error' ? outcome.value.text : undefined)
 
+        const queueRef = React.useRef(Promise.resolve())
+        const pendingCountRef = React.useRef(0)
+        const pathRef = React.useRef(undefined)
+        pathRef.current = state.absolutePath
+        const dropTargetRef = React.useRef(undefined)
+
+        const enqueueWrite = (fn) => {
+          pendingCountRef.current += 1
+          setBusy(true)
+          setError(undefined)
+          const task = queueRef.current.then(fn, fn)
+          queueRef.current = task.catch(() => {}).finally(() => {
+            pendingCountRef.current -= 1
+            if (pendingCountRef.current === 0) setBusy(false)
+          })
+          return task
+        }
+
         /**
          * Send one operation through the Host command. The panel never edits
          * its own copy: the write lands, and the file watch re-reads it.
          * @param op - the operation to apply.
          */
-        const send = async (op) => {
-          if (busy) return
-          if (state.absolutePath === undefined) { setError('还没有读到计划文件'); return }
-          setBusy(true)
-          setError(undefined)
-          try {
-            const path = state.absolutePath
-            const run = payload => ctx.remote.commands.execute(sessionId, '/todo op ' + JSON.stringify(payload), [])
-            let failure = failureOf(await run({ path, op }))
-            if (failure !== undefined && failure.includes('不认识的操作')) {
-              // Bridge for a host that predates the nested `{ path, op }` form:
-              // resend with the operation fields beside `path`.
-              failure = failureOf(await run({ path, ...op }))
+        const send = (op) => {
+          if (pathRef.current === undefined) { setError('还没有读到计划文件'); return Promise.resolve() }
+          return enqueueWrite(async () => {
+            const path = pathRef.current
+            if (path === undefined) { setError('还没有读到计划文件'); return }
+            try {
+              const run = payload => ctx.remote.commands.execute(sessionId, '/todo op ' + JSON.stringify(payload), [])
+              let failure = failureOf(await run({ path, op }))
+              if (failure !== undefined && failure.includes('不认识的操作')) {
+                // Bridge for a host that predates the nested `{ path, op }` form:
+                // resend with the operation fields beside `path`.
+                failure = failureOf(await run({ path, ...op }))
+              }
+              if (failure !== undefined) setError(failure)
+            } catch (failure) {
+              setError(String(failure?.message ?? failure))
             }
-            if (failure !== undefined) setError(failure)
-          } catch (failure) {
-            setError(String(failure?.message ?? failure))
-          } finally {
-            setBusy(false)
-          }
+          })
         }
 
         /** Create a plan file at the workspace root; the watch then loads it. */
-        const sendCreate = async () => {
-          if (busy) return
-          setBusy(true)
-          setError(undefined)
+        const sendCreate = () => enqueueWrite(async () => {
           try {
             const line = '/todo op ' + JSON.stringify({ op: { op: 'create' } })
             const failure = failureOf(await ctx.remote.commands.execute(sessionId, line, []))
             if (failure !== undefined) setError(failure)
           } catch (failure) {
             setError(String(failure?.message ?? failure))
-          } finally {
-            setBusy(false)
           }
-        }
+        })
 
         const handlers = {
           cycle(item) {
@@ -1946,6 +2128,8 @@ ${SWITCH_STYLE}
             void send({ op: 'settings', notifyWindow: seconds })
           },
           dragStart(kind, id, event) {
+            dropTargetRef.current = undefined
+            setDropTarget(undefined)
             setDrag({ kind, id })
             try {
               event.dataTransfer?.setData('text/plain', id)
@@ -1959,35 +2143,44 @@ ${SWITCH_STYLE}
             // A row already claimed this drag (it drew the insertion line); the
             // container must not overwrite that with "append to the stage".
             if (kind === 'stage' && event?.defaultPrevented === true) return
+            const setDropHint = (nextTarget) => {
+              const prev = dropTargetRef.current
+              if (prev?.kind === nextTarget?.kind && prev?.id === nextTarget?.id && prev?.before === nextTarget?.before) return
+              dropTargetRef.current = nextTarget
+              setDropTarget(nextTarget)
+            }
+            const computeBefore = (targetKind, targetId) => {
+              const rect = event.currentTarget?.getBoundingClientRect?.()
+              if (rect === undefined) return true
+              const mid = rect.top + rect.height / 2
+              const prev = dropTargetRef.current
+              if (prev !== undefined && prev.kind === targetKind && prev.id === targetId) {
+                if (event.clientY < mid - 3) return true
+                if (event.clientY > mid + 3) return false
+                return prev.before
+              }
+              return event.clientY < mid
+            }
             if (kind === 'group') {
               if (drag.kind !== 'group' || drag.id === id) return
               event.preventDefault()
-              const rect = event.currentTarget?.getBoundingClientRect?.()
-              setDropTarget({
-                kind: 'group',
-                id,
-                before: rect === undefined ? true : event.clientY < rect.top + rect.height / 2,
-              })
+              setDropHint({ kind: 'group', id, before: computeBefore('group', id) })
               return
             }
             if (drag.kind !== 'item') return
             event.preventDefault()
             if (kind === 'item') {
               if (drag.id === id) return
-              const rect = event.currentTarget?.getBoundingClientRect?.()
-              setDropTarget({
-                kind: 'item',
-                id,
-                before: rect === undefined ? true : event.clientY < rect.top + rect.height / 2,
-              })
+              setDropHint({ kind: 'item', id, before: computeBefore('item', id) })
             } else if (kind === 'stage') {
-              setDropTarget({ kind: 'stage', id })
+              setDropHint({ kind: 'stage', id })
             }
           },
           drop(event) {
             event.preventDefault()
             const moving = drag
-            const hint = dropTarget
+            const hint = dropTargetRef.current ?? dropTarget
+            dropTargetRef.current = undefined
             setDrag(undefined)
             setDropTarget(undefined)
             if (moving === undefined || hint === undefined || state.kind !== 'ready') return
@@ -2002,11 +2195,11 @@ ${SWITCH_STYLE}
             }
             const dragged = findItem(state, moving.id)
             if (dragged === undefined) return
-            const targetGroupId = hint.kind === 'item'
+            const targetGroupId = (hint.kind === 'item'
               ? findItem(state, hint.id)?.groupId
-              : hint.id
+              : hint.id) ?? '__none'
             const rows = state.plan.items
-              .filter(candidate => (candidate.groupId ?? '__none') === (targetGroupId ?? '__none'))
+              .filter(candidate => (candidate.groupId ?? '__none') === targetGroupId)
               .sort(byOrder)
             const ids = rows.map(candidate => candidate.id).filter(id => id !== moving.id)
             const at = hint.kind === 'item' ? ids.indexOf(hint.id) : -1
@@ -2015,6 +2208,7 @@ ${SWITCH_STYLE}
             setPendingMove({ kind: 'item', groupId: targetGroupId, ids, movedId: moving.id })
           },
           dragEnd() {
+            dropTargetRef.current = undefined
             setDrag(undefined)
             setDropTarget(undefined)
           },
@@ -2029,7 +2223,7 @@ ${SWITCH_STYLE}
             void send({
               op: 'reorder',
               ids: move.ids,
-              ...(move.groupId === undefined ? {} : { groupId: move.groupId }),
+              groupId: move.groupId === '__none' || move.groupId === undefined ? null : move.groupId,
             })
           },
           cancelMove() { setPendingMove(undefined) },
@@ -2090,12 +2284,15 @@ ${SWITCH_STYLE}
           if (typeof sessionId !== 'string' || sessionId === '') return undefined
           const current = getSessionSwitch(sessionId)
           setOn(current)
-          // Tell the Host even before the user touches it: the switch is stored
-          // in the browser, and the Host starts every Session switched off.
-          pushSessionSwitch(sessionId, current)
-          return subscribeSessionSwitch(value => setOn(value))
+          // Host starts every Session switched off; only push when the user
+          // previously switched it on, avoiding extra /todo rows on idle chats.
+          if (current === true) pushSessionSwitch(sessionId, true)
+          return subscribeSessionSwitch((value, changedId) => {
+            if (changedId === undefined || changedId === sessionId) setOn(value)
+          })
         }, [sessionId])
         React.useEffect(() => {
+          knownPath.current = undefined
           if (sessionId === undefined) return undefined
           let alive = true
           let seen
