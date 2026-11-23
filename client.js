@@ -1698,9 +1698,11 @@ ${SWITCH_STYLE}
         const { state, handlers } = props
         const view = props.view ?? {}
         const rootRef = React.useRef(null)
+        // Only the applied order drives the FLIP. Including the pending move
+        // made a confirmed drag animate twice: once when the preview cleared and
+        // once when the file watching re-read the new order.
         const orderKey = state.kind === 'ready'
           ? state.plan.items.map(item => `${item.id}:${item.groupId ?? ''}:${item.order}`).join('|')
-            + '||' + (view.pendingMove?.ids?.join(',') ?? '')
           : ''
         const layoutKey = `${view.page ?? 'plan'}|${Boolean(view.hideCompleted ?? (state.kind === 'ready' ? state.plan.hideCompleted : false))}|${(view.collapsed ?? []).join(',')}|${(view.foldedChildren ?? []).join(',')}`
         useRowFlip(rootRef, orderKey, layoutKey, view.drag !== undefined)

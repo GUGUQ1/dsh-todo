@@ -545,3 +545,13 @@ const cwd = exec.agent === undefined ? undefined : await ctx.workingDirectory.en
 - `tools/plan-store-test.mjs`、`tools/tool-test.mjs`、`tools/smoke-client.mjs`：补充 `md3` 主题与行级 `.dsh-todo-insert` 渲染断言。
 
 **验证**：见本轮 `node --check` 与 `npm test` 输出；真机仍待用户在 DSH 中切换 `Material Design` 主题及试拖确认。
+
+## 2026-11-24 · 合并 PR #1（v0.1.1）+ review 补充
+
+**PR #1**（Echora，`feat/v0.1.1-md3`）：安全加固（basename / planCwd fail-closed / realpath）、工具补齐（addGroup、note、reorderGroups、add 的 groupId/order/after/due/note、style 枚举修正）、repair 不再静默丢字段、读写前后双 stat + stale 哨兵、客户端写队列与合并窗口输入框修复、跨阶段拖拽预览、MD3 外观。
+
+**合并方式**：squash 成 `ef2ce10`（作者保留 Echora）——本来也只有 1 个提交。
+
+**我补的两处**：`cancelPendingForSession` 改成按 Session id 命中（原来拿 id 比对象，永远不中）；`useRowFlip` 的 `orderKey` 去掉 `pendingMove.ids`（确认后原本会播两段 FLIP）。另在 `DESIGN.md` 记下 md3 固定强调紫的例外，README/USAGE 补第四档外观与截图。
+
+**验证**：合并前在独立 worktree 跑过他的分支（35/35）；合并后在本机跑四套全绿；试合并无冲突；md3 深浅两版截图都看过。

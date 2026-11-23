@@ -40,7 +40,7 @@ To say "I'm working on X" or "X is next", just tell the agent — it is already 
   <img width="380" src="docs/images/problem-banner.png" alt="A row the host would reject">
 
 - **Notifying the agent**: panel edits reach the agent in one of three modes — `next turn` (default, no interruption), `wake now`, or `do not notify`. Bursts merge into one notice within a window (8 seconds by default, configurable).
-- **Three looks**: `vivid` (default — coloured header, a 4px rail down each card, a matching outline), `paper` (hued header with a paper-like grain), and `calm` (no hue, one hairline). Advanced materials (gradients, layered shadows, frosted glass) have their own switch so you can trade looks for speed.
+- **Four looks**: `vivid` (default — coloured header, a 4px rail down each card, a matching outline), `md3` (Material Design 3: tonal containers, pill badges, white rounded row cards), `paper` (hued header with a paper-like grain), and `calm` (no hue, one hairline). Advanced materials (gradients, layered shadows, frosted glass) have their own switch so you can trade looks for speed.
 
   <img width="380" src="docs/images/settings.png" alt="Settings page">
 

@@ -108,7 +108,7 @@
 
 ### 外观
 
-- **风格**：`灵动`（**默认**：彩色标题栏 + 卡片左侧 4px 导轨 + 同色描边，进行中更抢眼）/ `纸感`（阶段标题带淡色相底，卡片有纸的层次）/ `收敛`（阶段标题不染色，只留发丝线）。
+- **风格**：`灵动`（**默认**：彩色标题栏 + 卡片左侧 4px 导轨 + 同色描边，进行中更抢眼）/ `Material Design`（`md3`：色调容器 + 胶囊徽章 + 白色圆角行卡片，行与卡片都有投影）/ `纸感`（阶段标题带淡色相底，卡片有纸的层次）/ `收敛`（阶段标题不染色，只留发丝线）。
 - **高级材质**：渐变、分层投影、毛玻璃、内高光。默认开；对性能敏感可以关掉，面板会变成纯色块。
 
 两者都存在计划文件的 `ui.style` / `ui.material` 里，跟着文件走；只影响观感，不影响数据。
@@ -116,6 +116,10 @@
 | 灵动（默认） | 纸感 | 收敛 |
 |---|---|---|
 | <img width="240" src="images/style-vivid.png" alt="灵动"> | <img width="240" src="images/panel-light.png" alt="纸感"> | <img width="240" src="images/style-calm.png" alt="收敛"> |
+
+| Material Design 3（`md3`） | md3 · 深色 |
+|---|---|
+| <img width="240" src="images/style-md3.png" alt="Material Design 3"> | <img width="240" src="images/style-md3-dark.png" alt="md3 深色"> |
 
 深色主题下同一套规则会把投影变成高光，所以看起来更「发光」：
 

@@ -77,8 +77,9 @@ function sessionEnabledById(id, header) {
 
 function cancelPendingForSession(sessionId, sessionObj) {
   for (const [key, bucket] of pending.entries()) {
+    const keyId = typeof key === 'string' ? key : (key?.id ?? key?.header?.id)
     if ((sessionObj !== undefined && key === sessionObj)
-      || (typeof sessionId === 'string' && sessionId !== '' && (key?.id === sessionId || key?.header?.id === sessionId))) {
+      || (typeof sessionId === 'string' && sessionId !== '' && keyId === sessionId)) {
       clearTimeout(bucket.timer)
       pending.delete(key)
     }
@@ -140,7 +141,10 @@ function noticeMessage(text) {
  * @param ui - the plan's ui block (notify mode and window).
  */
 function notifyAgent(agent, note, ui) {
-  const key = agent?.session
+  const session = agent?.session
+  // Key by the Session id when it has one: the switch is stored per id, and a
+  // queued notice must be cancellable from setSessionEnabled(sessionId).
+  const key = (typeof session?.id === 'string' && session.id !== '') ? session.id : session
   // If notifications or the session switch were turned off, cancel any queued notice.
   if (ui?.notify === 'off' || agent === undefined || !sessionEnabled(agent)) {
     if (key !== undefined && pending.has(key)) {

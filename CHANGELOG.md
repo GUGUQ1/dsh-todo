@@ -21,6 +21,12 @@
 - 修复删除事项通知显示随机 ID 的问题、连续点击写入被静默丢弃的问题、`hideCompleted` 本地状态永久覆盖文件值的问题、关通知或关会话开关后已排队定时器仍触发的问题、多会话开关串台与路径缓存未重置、子项折叠缺少 `inert`、SVG 属性名及未引用代码残留（F6、F7、C1–C4、C7–C10）。
 - 修复中英文 README 末尾 `node:` 断行、子项缩进调至 `48px`、修正 `DESIGN.md`/`DECISIONS.md` 文案错位、`package.json` `files` 补充 `"assets"`，并同步 `SPEC.md`、`docs/COMPAT.md`；修复 `tools/command-test.mjs` Windows 悬空联接清理偶发 `ENOTEMPTY` 导致退出码非 0 的问题（D1–D4）。
 
+### 修复（合并 PR #1 后的两处 review 补充，2026-11-24）
+
+- `cancelPendingForSession` 之前拿 Session id 去比 `agent.session` 对象，永远命中不了；现在排队通知按 Session id 作键，关开关/关通知时能真正撤掉已排队的那一条。
+- 拖动确认后 FLIP 可能播两段：`orderKey` 里带了 `pendingMove.ids`，确认清空预览与文件刷新各触发一次；现在只由已落盘顺序驱动。
+- `DESIGN.md` 记下 md3 固定强调紫的例外（接受），README/USAGE 补第四档外观与两张截图。
+
 ## [0.1.0] - 2026-11-22
 
 首个公开版本。面板、写入通道、模型工具与通知链路都在真实会话里端到端验证过（子对话 8 步全通，5 条非法调用全部被拦且文件零改动）。
