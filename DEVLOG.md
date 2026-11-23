@@ -555,3 +555,11 @@ const cwd = exec.agent === undefined ? undefined : await ctx.workingDirectory.en
 **我补的两处**：`cancelPendingForSession` 改成按 Session id 命中（原来拿 id 比对象，永远不中）；`useRowFlip` 的 `orderKey` 去掉 `pendingMove.ids`（确认后原本会播两段 FLIP）。另在 `DESIGN.md` 记下 md3 固定强调紫的例外，README/USAGE 补第四档外观与截图。
 
 **验证**：合并前在独立 worktree 跑过他的分支（35/35）；合并后在本机跑四套全绿；试合并无冲突；md3 深浅两版截图都看过。
+
+## 2026-11-24 · 介绍口径：白板而不是任务管理器
+
+**反馈**：相关介绍（包括 GitHub 上的）应该强调这个面板更像是给 agent 和用户共用的一块记事板/白板，用来提醒双方当前处在哪个阶段。
+
+**改动**：README 中英首段各加一段定位说明；`docs/USAGE.md` 开头加一句；`docs/AGENT.md` 新增「先记住它是什么」——明确"看到未完成事项不等于要现在做"；`package.json` 的 description 与 GitHub 仓库描述一并改成 shared plan board 口径。
+
+**注意**：`docs/AGENT.md` 是注册成技能 `dsh-todo-plan` 的运行时文档，**改完要重启 DSH** 才会进入助手的技能内容。

@@ -2,6 +2,8 @@
 
 A project plan panel for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH): a right-sidebar tab that tracks cross-session work by stage, with dependencies and due dates.
 
+**It is closer to a whiteboard you share with the agent than to a task manager.** The panel schedules nothing, nags nobody and never starts work on its own — it is a note board in the right sidebar: you write down where things stand, the agent writes down where it stands, and both of you read the same board. Come back in a few days, in another session, and it still remembers which stage you were in.
+
 <img width="380" src="docs/images/style-vivid.png" alt="The plan panel">
 
 ## Why another todo list

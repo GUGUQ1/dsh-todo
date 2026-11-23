@@ -2,7 +2,7 @@
   "name": "dsh-todo",
   "version": "0.1.1",
   "type": "module",
-  "description": "Project todo list and progress in the DSH right sidebar.",
+  "description": "A shared plan board for you and the agent in the DeepSeek Harness right sidebar: stages, dependencies, due dates, and a passive reminder of where the work stands.",
   "license": "MIT",
   "author": "GUGUQ1",
   "repository": {
