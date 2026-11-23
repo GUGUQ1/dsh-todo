@@ -67,6 +67,48 @@ try {
   await run({ action: 'settings', notify: 'wake' })
   assert.equal(JSON.parse(await readFile(file, 'utf8')).ui.notify, 'wake')
 
+  // F1: vivid & md3 styles are selectable via tool
+  await run({ action: 'settings', style: 'calm' })
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).ui.style, 'calm')
+  await run({ action: 'settings', style: 'md3' })
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).ui.style, 'md3')
+  await run({ action: 'settings', style: 'vivid' })
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).ui.style, 'vivid')
+
+  // F10: addGroup, add with after/due, note, reorder with groupId, reorderGroups
+  await run({ action: 'addGroup', id: 'g2', title: '阶段二', mode: 'parallel' })
+  await run({ action: 'add', groupId: 'g2', title: '依赖事项', after: ['a'], due: '2026-12-15' })
+  let current = JSON.parse(await readFile(file, 'utf8'))
+  assert.equal(current.groups.length, 2)
+  const depItem = current.items.find(item => item.title === '依赖事项')
+  assert.deepEqual(depItem.after, ['a'])
+  assert.equal(depItem.due, '2026-12-15')
+
+  await run({ action: 'note', id: depItem.id, note: '关键备注' })
+  current = JSON.parse(await readFile(file, 'utf8'))
+  assert.equal(current.items.find(item => item.id === depItem.id).note, '关键备注')
+
+  // Null clears nullable parameters (due, note, next id, move groupId), while status rejects id: null
+  await run({ action: 'note', id: depItem.id, note: null })
+  await run({ action: 'due', id: depItem.id, due: null })
+  await run({ action: 'next', id: null })
+  await run({ action: 'move', id: 'a', order: 1, groupId: null })
+  current = JSON.parse(await readFile(file, 'utf8'))
+  const clearedItem = current.items.find(item => item.id === depItem.id)
+  assert.equal(clearedItem.note, undefined)
+  assert.equal(clearedItem.due, undefined)
+  assert.equal(current.ui.next, null)
+  assert.equal(current.items.find(item => item.id === 'a').groupId, undefined)
+  await assert.rejects(() => run({ action: 'status', id: null, status: 'completed' }), /id 必须是字符串/)
+
+  await run({ action: 'reorder', ids: [depItem.id, 'b'], groupId: 'g2' })
+  current = JSON.parse(await readFile(file, 'utf8'))
+  assert.equal(current.items.find(item => item.id === 'b').groupId, 'g2')
+
+  await run({ action: 'reorderGroups', ids: ['g2', 'g1'] })
+  current = JSON.parse(await readFile(file, 'utf8'))
+  assert.equal(current.groups.find(group => group.id === 'g2').order, 1)
+
   await run({ action: 'open' })
   assert.equal(JSON.parse(await readFile(file, 'utf8')).ui.openRequest, 1, 'open bumps the panel request')
 

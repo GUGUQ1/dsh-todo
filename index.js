@@ -9,9 +9,9 @@
  */
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { readFile, readdir, writeFile } from 'node:fs/promises'
+import { readFile, readdir, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { applyOpAndWrite, createPlanFile, PLAN_FILE, readPlanFile } from './host/plan.js'
 
 /** Required Host services. */
@@ -75,6 +75,16 @@ function sessionEnabledById(id, header) {
   return sessionFlags.get(id) === true
 }
 
+function cancelPendingForSession(sessionId, sessionObj) {
+  for (const [key, bucket] of pending.entries()) {
+    if ((sessionObj !== undefined && key === sessionObj)
+      || (typeof sessionId === 'string' && sessionId !== '' && (key?.id === sessionId || key?.header?.id === sessionId))) {
+      clearTimeout(bucket.timer)
+      pending.delete(key)
+    }
+  }
+}
+
 /**
  * Set the switch for one Session.
  * @param sessionId - the Session id.
@@ -83,8 +93,10 @@ function sessionEnabledById(id, header) {
  */
 export function setSessionEnabled(sessionId, enabled) {
   if (typeof sessionId !== 'string' || sessionId === '') return false
-  sessionFlags.set(sessionId, enabled === true)
-  return enabled === true
+  const next = enabled === true
+  sessionFlags.set(sessionId, next)
+  if (!next) cancelPendingForSession(sessionId)
+  return next
 }
 
 /** What the model is told when this Session has the panel switched on. */
@@ -128,16 +140,24 @@ function noticeMessage(text) {
  * @param ui - the plan's ui block (notify mode and window).
  */
 function notifyAgent(agent, note, ui) {
-  if (note === null || ui.notify === 'off' || agent === undefined) return
-  // A Session with the panel switched off hears nothing about panel edits.
-  if (!sessionEnabled(agent)) return
-  const key = agent.session
-  const bucket = pending.get(key) ?? { notes: [], timer: undefined }
+  const key = agent?.session
+  // If notifications or the session switch were turned off, cancel any queued notice.
+  if (ui?.notify === 'off' || agent === undefined || !sessionEnabled(agent)) {
+    if (key !== undefined && pending.has(key)) {
+      clearTimeout(pending.get(key).timer)
+      pending.delete(key)
+    }
+    return
+  }
+  if (note === null) return
+  const bucket = pending.get(key) ?? { notes: [], timer: undefined, notify: ui.notify }
+  bucket.notify = ui.notify
   if (!bucket.notes.includes(note)) bucket.notes.push(note)
   if (bucket.timer !== undefined) clearTimeout(bucket.timer)
   const window = Math.max(1, Math.min(600, Number.isInteger(ui.notifyWindow) ? ui.notifyWindow : 8))
   bucket.timer = setTimeout(() => {
     pending.delete(key)
+    if (!sessionEnabled(agent) || bucket.notify === 'off') return
     const text = `（面板）用户在计划面板里${bucket.notes.join('；')}。需要时用 todolist read 看最新计划；不要因为这条通知开始新工作。`
     try {
       const message = noticeMessage(text)
@@ -151,7 +171,7 @@ function notifyAgent(agent, note, ui) {
         && Array.isArray(message.content)
         && typeof message.source?.kind === 'string'
       if (!shaped) return
-      if (ui.notify === 'wake') agent.followup(message)
+      if (bucket.notify === 'wake') agent.followup(message)
       else agent.inject(message)
     } catch {
       // A Session that has gone away has nobody to tell.
@@ -164,16 +184,18 @@ function notifyAgent(agent, note, ui) {
  * One clause describing an operation, for the notification.
  * @param op - the applied operation.
  * @param plan - the plan after the write.
+ * @param beforePlan - optional plan snapshot before the write (for `remove`).
  * @returns the clause.
  */
-function describeOp(op, plan) {
-  const find = id => {
-    for (const item of plan.items) {
+function describeOp(op, plan, beforePlan) {
+  const findIn = (source, id) => {
+    for (const item of source?.items ?? []) {
       if (item.id === id) return item
       for (const child of item.children ?? []) if (child.id === id) return child
     }
     return undefined
   }
+  const find = id => findIn(plan, id) ?? findIn(beforePlan, id)
   const named = id => {
     const item = find(id)
     return item === undefined ? id : `「${item.title}」`
@@ -187,6 +209,7 @@ function describeOp(op, plan) {
     case 'addGroup': return `新增了阶段「${op.title}」`
     case 'remove': return `删除了 ${named(op.id)}`
     case 'move': case 'reorder': return '调整了事项顺序'
+    case 'reorderGroups': return '调整了阶段顺序'
     case 'due': return `改了 ${named(op.id)} 的截止日期`
     case 'settings':
       if (op.notify !== undefined) return `把通知方式改成 ${op.notify}`
@@ -204,14 +227,34 @@ function describeOp(op, plan) {
 const USAGE = '用法：/todo op {"path":"<绝对路径>","op":"toggle","id":"…"}'
 
 /**
- * Whether a target path stays inside a root directory.
+ * Resolve the real path of a file or its existing parent directory so symlink
+ * escapes cannot bypass workspace containment checks.
+ * @param target - candidate path.
+ * @returns resolved real path.
+ */
+async function resolveReal(target) {
+  try {
+    return await realpath(target)
+  } catch {
+    try {
+      return join(await realpath(dirname(target)), basename(target))
+    } catch {
+      return resolve(target)
+    }
+  }
+}
+
+/**
+ * Whether a target path stays inside a root directory after resolving symlinks.
  * @param root - workspace root.
  * @param target - candidate path.
  * @returns whether `target` is the root or below it.
  */
-function inside(root, target) {
-  const path = relative(resolve(root), resolve(target))
-  return path === '' || (!path.startsWith('..') && !isAbsolute(path))
+async function insideWorkspace(root, target) {
+  const realRoot = await resolveReal(root)
+  const realTarget = await resolveReal(target)
+  const rel = relative(realRoot, realTarget)
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
 
 /**
@@ -266,6 +309,7 @@ function summarize(plan) {
       const tags = [
         item.due === undefined ? '' : `截止 ${item.due}`,
         (item.after ?? []).length > 0 ? `前置 ${(item.after ?? []).join(',')}` : '',
+        item.note === undefined ? '' : `备注 ${item.note}`,
         item.id === nextId ? '← 下一步' : '',
       ].filter(Boolean).join(' · ')
       lines.push(`- [${mark(item.status)}] ${item.title} (${item.id})${tags === '' ? '' : ' — ' + tags}`)
@@ -494,6 +538,8 @@ export function buildToolDefinition(options) {
  * @param args - candidate arguments.
  * @returns one message per violation; empty means valid.
  */
+const NULLABLE_PARAMS = new Set(['groupId', 'due', 'note'])
+
 function checkArgs(spec, args) {
   if (args === null || typeof args !== 'object' || Array.isArray(args)) return ['参数必须是对象']
   const problems = []
@@ -503,6 +549,7 @@ function checkArgs(spec, args) {
       if (rule.required === true) problems.push(`缺少参数 ${name}`)
       continue
     }
+    if (value === null && (NULLABLE_PARAMS.has(name) || (name === 'id' && (args.action === 'next' || args.action === 'addGroup')))) continue
     if (rule.enum !== undefined && !rule.enum.includes(value)) {
       problems.push(`${name} 必须是 ${rule.enum.join(' / ')}`)
     } else if (rule.type === 'string' && typeof value !== 'string') {
@@ -520,27 +567,6 @@ function checkArgs(spec, args) {
     if (!(key in spec)) problems.push(`不认识的参数 ${key}`)
   }
   return problems
-}
-
-/**
- * Register the model-facing tool over the same write path the panel uses.
- *
- * Registration is attempted now and again once `tools` is active: at apply time
- * that service may not be ready yet, and registering into a missing registry is
- * how the tool vanished without an error (found 2026-11-22 by a real sub-conversation).
- * @param ctx - Host context with the tool registry.
- * @param options - `buildTool` overrides the definition builder (tests only).
- */
-/**
- * The session's working directory. A tool run context may carry it as
- * `session.cwd`, or only in the session header — the command handler needs the
- * same fallback, so both go through here.
- * @param exec - tool or command run context.
- * @returns the directory, or undefined when the composition does not expose one.
- */
-function sessionCwd(exec) {
-  const cwd = exec?.agent?.session?.cwd ?? exec?.agent?.session?.header?.cwd
-  return typeof cwd === 'string' && cwd !== '' ? cwd : undefined
 }
 
 /**
@@ -622,27 +648,33 @@ export async function registerTool(ctx, options = {}) {
     tool = build({
       name: 'todolist',
       description: 'Read or change the workspace plan file (todolist.json) that the Plan panel shows. '
-        + 'Actions: read, add, addChild, status, rename, due, remove, move, reorder, settings, next, open, create. '
+        + 'Actions: read, add, addChild, addGroup, status, rename, due, note, remove, move, reorder, reorderGroups, settings, next, open, create. '
         + 'Use it whenever the user asks about or changes the plan; ids come from read.',
       parameters: {
         action: {
           type: 'string',
           required: true,
-          enum: ['read', 'add', 'addChild', 'status', 'rename', 'due', 'remove', 'move', 'reorder', 'settings', 'next', 'open', 'create'],
+          enum: [
+            'read', 'add', 'addChild', 'addGroup', 'status', 'rename', 'due', 'note',
+            'remove', 'move', 'reorder', 'reorderGroups', 'settings', 'next', 'open', 'create',
+          ],
           description: 'What to do.',
         },
-        id: { type: 'string', description: 'Item or child id for status/rename/due/remove/next.' },
-        title: { type: 'string', description: 'Title for add, addChild, rename, or create.' },
+        id: { type: 'string', description: 'Item, child, or stage id (or "" / null to clear next).' },
+        title: { type: 'string', description: 'Title for add, addChild, addGroup, rename, or create.' },
         parentId: { type: 'string', description: 'Parent item id for addChild.' },
-        groupId: { type: 'string', description: 'Stage id for add or move.' },
+        groupId: { type: 'string', description: 'Stage id for add, move, or reorder ("" / "__none" / null for ungrouped).' },
+        mode: { type: 'string', enum: ['sequence', 'parallel', 'free'], description: 'Stage mode for addGroup.' },
         status: { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'New status.' },
-        order: { type: 'integer', description: 'New order inside the stage.' },
-        ids: { type: 'array', items: { type: 'string' }, description: 'Ids in their new order, for reorder.' },
-        due: { type: 'string', description: 'ISO date (2026-12-01) or empty string to clear.' },
+        order: { type: 'integer', description: 'Order inside the stage (or stage order for addGroup).' },
+        ids: { type: 'array', items: { type: 'string' }, description: 'Ids in their new order, for reorder or reorderGroups.' },
+        after: { type: 'array', items: { type: 'string' }, description: 'Prerequisite item ids for add.' },
+        due: { type: 'string', description: 'ISO date (2026-12-01), or "" / null to clear.' },
+        note: { type: 'string', description: 'Item note for note action ("" / null to clear) or add.' },
         hideCompleted: { type: 'boolean', description: 'Panel display setting.' },
         notify: { type: 'string', enum: ['next-turn', 'wake', 'off'], description: 'How panel edits reach you.' },
         notifyWindow: { type: 'integer', description: 'Seconds over which panel edits merge into one notice (1..600).' },
-        style: { type: 'string', enum: ['paper', 'calm'], description: 'Panel look: paper (default) or calm.' },
+        style: { type: 'string', enum: ['vivid', 'md3', 'paper', 'calm'], description: 'Panel look: vivid (default), md3 (Material Design), paper, or calm.' },
         material: { type: 'boolean', description: 'Advanced materials (gradients, shadows, glass). Off is flatter and cheaper.' },
       },
       output: {
@@ -675,14 +707,55 @@ export async function registerTool(ctx, options = {}) {
 
         let op
         switch (args.action) {
-          case 'add': op = { op: 'add', title: args.title, groupId: args.groupId }; break
-          case 'addChild': op = { op: 'addChild', parentId: args.parentId, title: args.title }; break
+          case 'add':
+            op = {
+              op: 'add',
+              title: args.title,
+              ...(args.groupId === undefined ? {} : { groupId: args.groupId }),
+              ...(args.order === undefined ? {} : { order: args.order }),
+              ...(args.after === undefined ? {} : { after: args.after }),
+              ...(args.due === undefined || args.due === '' || args.due === null ? {} : { due: args.due }),
+              ...(args.note === undefined || args.note === '' || args.note === null ? {} : { note: args.note }),
+            }
+            break
+          case 'addChild':
+            op = {
+              op: 'addChild',
+              parentId: args.parentId,
+              title: args.title,
+              ...(args.status === undefined ? {} : { status: args.status }),
+            }
+            break
+          case 'addGroup':
+            op = {
+              op: 'addGroup',
+              title: args.title,
+              ...(args.id === undefined || args.id === null ? {} : { id: args.id }),
+              ...(args.mode === undefined ? {} : { mode: args.mode }),
+              ...(args.order === undefined ? {} : { order: args.order }),
+            }
+            break
           case 'status': op = { op: 'status', id: args.id, status: args.status }; break
           case 'rename': op = { op: 'rename', id: args.id, title: args.title }; break
-          case 'due': op = { op: 'due', id: args.id, due: args.due === '' ? null : args.due }; break
+          case 'due': op = { op: 'due', id: args.id, due: args.due === '' || args.due === null ? null : args.due }; break
+          case 'note': op = { op: 'note', id: args.id, note: args.note === '' || args.note === null ? null : args.note }; break
           case 'remove': op = { op: 'remove', id: args.id }; break
-          case 'move': op = { op: 'move', id: args.id, order: args.order, groupId: args.groupId }; break
-          case 'reorder': op = { op: 'reorder', ids: args.ids }; break
+          case 'move':
+            op = {
+              op: 'move',
+              id: args.id,
+              order: args.order,
+              ...(args.groupId === undefined ? {} : { groupId: args.groupId }),
+            }
+            break
+          case 'reorder':
+            op = {
+              op: 'reorder',
+              ids: args.ids,
+              ...(args.groupId === undefined ? {} : { groupId: args.groupId }),
+            }
+            break
+          case 'reorderGroups': op = { op: 'reorderGroups', ids: args.ids }; break
           case 'settings': op = { op: 'settings', hideCompleted: args.hideCompleted, notify: args.notify, notifyWindow: args.notifyWindow, style: args.style, material: args.material }; break
           case 'next': op = { op: 'next', id: args.id ?? null }; break
           case 'open': op = { op: 'open' }; break
@@ -696,14 +769,28 @@ export async function registerTool(ctx, options = {}) {
   } catch (error) {
     await recordStatus('tool', { ok: false, error: String(error?.message ?? error) })
     console.error('[dsh-todo] 工具定义构建失败：', error)
-    return
+    return () => {}
+  }
+
+  let disposed = false
+  let registeredDispose
+  let injectDispose
+  const dispose = () => {
+    disposed = true
+    registeredDispose?.()
+    injectDispose?.()
   }
 
   const attempt = async () => {
+    if (disposed) return true
     const tools = toolsService(ctx)
     if (tools === undefined) return false
     try {
-      tools.register(tool)
+      const cleanup = tools.register(tool)
+      if (typeof cleanup === 'function') {
+        if (disposed) cleanup()
+        else registeredDispose = cleanup
+      }
       await recordStatus('tool', { ok: true, name: tool.name, parameters: Object.keys(tool.parameters.properties ?? {}).length })
     } catch (error) {
       await recordStatus('tool', { ok: false, error: String(error?.message ?? error) })
@@ -712,16 +799,18 @@ export async function registerTool(ctx, options = {}) {
     return true
   }
 
-  if (await attempt()) return
+  if (await attempt()) return dispose
   // `tools` was not active during apply; register as soon as it is. Never throw:
   // a missing tool must not take the panel or the command down with it.
   try {
-    ctx.inject(['tools'], () => { void attempt() })
+    const inj = ctx.inject(['tools'], () => { if (!disposed) void attempt() })
+    if (typeof inj === 'function') injectDispose = inj
     await recordStatus('tool', { ok: false, deferred: true })
   } catch (error) {
     await recordStatus('tool', { ok: false, error: String(error?.message ?? error) })
     console.error('[dsh-todo] 等待 tools 服务失败：', error)
   }
+  return dispose
 }
 
 /**
@@ -773,26 +862,26 @@ export function apply(ctx) {
         return { kind: 'success', text: enabled ? '本会话已启用计划面板' : '本会话已停用计划面板' }
       }
 
-      // The Session header's cwd is the only authority for what "inside the
-      // workspace" means; when it is unavailable, the file-name check below is
-      // the remaining guard.
-      const cwd = sessionCwd({ agent })
+      // Workspace cwd is mandatory (fail-closed) and resolved via planCwd.
+      const cwd = await planCwd(ctx, { agent })
+      if (typeof cwd !== 'string' || cwd === '') {
+        return { kind: 'error', text: '拿不到会话工作区，无法修改计划文件' }
+      }
+
       let file
       if (typeof payload.path === 'string' && payload.path !== '') {
-        file = resolve(payload.path)
-      } else if (op.op === 'create' && typeof cwd === 'string' && cwd !== '') {
+        file = isAbsolute(payload.path) ? resolve(payload.path) : resolve(cwd, payload.path)
+      } else if (op.op === 'create') {
         // Creating is the one write that may not know a path yet: the panel has
         // nothing to read, so the workspace root decides.
         file = resolve(cwd, PLAN_FILE)
-      } else if (op.op === 'create') {
-        return { kind: 'error', text: '拿不到会话工作区，无法创建计划' }
       } else {
         return { kind: 'error', text: '缺少 path' }
       }
-      if (!file.endsWith(PLAN_FILE)) {
+      if (basename(file) !== PLAN_FILE) {
         return { kind: 'error', text: `只允许修改名为 ${PLAN_FILE} 的文件` }
       }
-      if (typeof cwd === 'string' && cwd !== '' && !inside(cwd, file)) {
+      if (!(await insideWorkspace(cwd, file))) {
         return { kind: 'error', text: `路径不在会话工作区内：${file}` }
       }
 
@@ -802,9 +891,10 @@ export function apply(ctx) {
         return { kind: 'error', text: created.error === 'already-exists' ? '计划文件已存在' : created.error }
       }
 
+      const beforeRead = op.op === 'remove' ? await readPlanFile(file) : undefined
       const result = await applyOpAndWrite(file, op)
       if (!result.ok) return { kind: 'error', text: result.error }
-      notifyAgent(agent, describeOp(op, result.plan), result.plan.ui)
+      notifyAgent(agent, describeOp(op, result.plan, beforeRead?.plan), result.plan.ui)
       const notes = Array.isArray(result.notes) ? result.notes : []
       if (op.op === 'repair') {
         if (notes.length === 0) return { kind: 'success', text: '文件没有问题，不需要修复' }
@@ -815,7 +905,22 @@ export function apply(ctx) {
   }), 'dsh-todo: todo command')
   // The tool and the skill are both optional: a composition without those
   // registries must not take the panel or the write command down with it.
-  void registerTool(ctx)
+  ctx.effect(() => {
+    let active = true
+    let cleanup
+    void registerTool(ctx).then(fn => {
+      if (!active) fn?.()
+      else cleanup = fn
+    })
+    return () => {
+      active = false
+      cleanup?.()
+    }
+  }, 'dsh-todo: model tool')
+  ctx.effect(() => () => {
+    for (const bucket of pending.values()) clearTimeout(bucket.timer)
+    pending.clear()
+  }, 'dsh-todo: notification timers')
   ctx.effect(() => registerSessionPrompt(ctx), 'dsh-todo: session prompt')
   ctx.effect(() => registerSkill(ctx), 'dsh-todo: usage skill')
 }

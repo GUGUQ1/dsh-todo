@@ -275,11 +275,13 @@ const back = findAll(settings, 'data-action').find(node => node.props['data-acti
 back.props.onClick({ stopPropagation() {} })
 assert.deepEqual(calls.at(-1), ['page', 'plan'], 'the back control returns to the plan')
 
-// Appearance: two looks plus an independent materials switch.
+// Appearance: four looks plus an independent materials switch.
 const styleChoices = findAll(settings, 'data-action').filter(node => String(node.props['data-action']).startsWith('style-'))
-assert.equal(styleChoices.length, 3, 'all three looks are offered')
+assert.equal(styleChoices.length, 4, 'all four looks are offered')
 assert.equal(styleChoices.find(node => node.props['data-action'] === 'style-vivid').props['aria-pressed'], true,
   'vivid is the pressed default')
+styleChoices.find(node => node.props['data-action'] === 'style-md3').props.onClick()
+assert.deepEqual(calls.at(-1), ['style', 'md3'], 'picking md3 asks for it')
 styleChoices.find(node => node.props['data-action'] === 'style-calm').props.onClick()
 assert.deepEqual(calls.at(-1), ['style', 'calm'], 'picking a look asks for it')
 const materialSwitch = findAll(settings, 'data-action').find(node => node.props['data-action'] === 'toggle-material')
@@ -321,13 +323,15 @@ const folded = render(React.createElement(ui.PlanPanel, {
   now,
 }))
 // Children stay mounted inside a collapsing grid row so the height can animate;
-// "folded" is expressed by data-open, not by removing the nodes.
+// "folded" is expressed by data-open, not by removing the nodes, and inert keeps focus out.
 const foldedChildrenBox = findAll(folded, 'className')
   .find(node => String(node.props.className).includes('dsh-todo-children'))
 assert.equal(foldedChildrenBox.props['data-open'], undefined, 'a folded parent keeps its children collapsed')
+assert.equal(foldedChildrenBox.props.inert, '', 'a folded parent sets inert on collapsed children')
 const openChildrenBox = findAll(ready, 'className')
   .find(node => String(node.props.className).includes('dsh-todo-children'))
 assert.equal(openChildrenBox.props['data-open'], '', 'an open parent marks its children open')
+assert.equal(openChildrenBox.props.inert, undefined, 'an open parent does not mark children inert')
 assert.ok(text(folded).includes('+1'), 'a folded parent says how many children it hides')
 
 const moving = render(React.createElement(ui.PlanPanel, {
@@ -422,6 +426,8 @@ const withView = view => render(React.createElement(ui.PlanPanel, {
 const dropping = withView({ dropTarget: { kind: 'item', id: 'b', before: true } })
 const rowB = findAll(dropping, 'data-item').find(node => node.props['data-item'] === 'b')
 assert.equal(rowB.props['data-drop'], 'before', 'hovering a row draws the insertion line there')
+assert.ok(findAll(dropping, 'className').some(node => String(node.props.className).includes('dsh-todo-insert')),
+  'hovering a row renders a standalone .dsh-todo-insert bar')
 const appending = withView({ dropTarget: { kind: 'stage', id: 'g1' } })
 assert.ok(findAll(appending, 'className').some(node => String(node.props.className).includes('dsh-todo-insert')),
   'dropping on empty space shows where the row will land')
@@ -465,7 +471,17 @@ ctx.remote.commands.execute = async (sessionId, line) => {
   sent.push([sessionId, line])
   return { ok: true, value: { kind: 'success', text: '' } }
 }
+const cleanups = []
+const originalUseEffect = React.useEffect
+React.useEffect = (fn) => {
+  const dispose = fn()
+  if (typeof dispose === 'function') cleanups.push(dispose)
+}
 const chip = render(React.createElement(ui.OpenChip, { sessionId: 's-switch' }))
+React.useEffect = originalUseEffect
+for (const dispose of cleanups) dispose()
+assert.equal(sent.length, 0, 'mounting OpenChip when switched off does not send /todo')
+
 const switchControl = findAll(chip, 'data-action').find(node => node.props['data-action'] === 'toggle-session')
 assert.ok(switchControl, 'the composer offers a switch')
 assert.equal(switchControl.props['aria-checked'], false, 'a new conversation starts switched off')
@@ -474,6 +490,33 @@ switchControl.props.onClick()
 assert.equal(sent.at(-1)[0], 's-switch', 'the switch speaks for its own Session')
 assert.match(sent.at(-1)[1], /"op":"session"/, 'the switch sends the session operation')
 assert.match(sent.at(-1)[1], /"enabled":true/, 'the switch sends the new value')
+
+// F4: cross-stage pendingMove renders moved item in target stage and hides it from source stage
+const crossPlan = normalizePlan({
+  version: 1,
+  rev: 8,
+  title: '跨阶段测试',
+  ui: {},
+  groups: [
+    { id: 'g1', title: '阶段一', mode: 'free', order: 1 },
+    { id: 'g2', title: '阶段二', mode: 'free', order: 2 },
+  ],
+  items: [
+    { id: 'i1', groupId: 'g1', order: 1, title: '源阶段事项', status: 'pending' },
+    { id: 'i2', groupId: 'g2', order: 1, title: '目标阶段事项', status: 'pending' },
+  ],
+}).plan
+const crossRendered = render(React.createElement(ui.PlanPanel, {
+  state: { kind: 'ready', plan: crossPlan },
+  view: { pendingMove: { kind: 'item', groupId: 'g2', ids: ['i1', 'i2'], movedId: 'i1' } },
+  handlers,
+  now,
+}))
+const stageBoxes = findAll(crossRendered, 'className')
+  .filter(node => String(node.props.className).split(' ').includes('dsh-todo-stage'))
+assert.equal(stageBoxes.length, 2)
+assert.ok(!text(stageBoxes[0]).includes('源阶段事项'), 'source stage hides moved item during preview')
+assert.ok(text(stageBoxes[1]).includes('源阶段事项'), 'target stage shows moved item during preview')
 
 const offline = text(render(React.createElement(ui.PlanPanel, {
   state: { kind: 'ready', plan: normalized.plan },

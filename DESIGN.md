@@ -47,14 +47,14 @@
 | 间距 | 4 的倍数（4/8/12/16） | padding / margin |
 | 阴影 | 只有两处：卡片（材质开启时）与拖动确认条；其余一律不用 | — |
 
-## 两种外观（设置页可选，存 `ui.style`）
+## 四种外观（设置页可选，存 `ui.style`）
 
-| | `paper` | `calm` | `vivid`（灵动，默认） |
-|---|---|---|---|
-| 阶段标题底 | 阶段色相 14% | 透明 | 阶段色相 24% |
-| 卡片 | 墨色 3% + 发丝环 | 同左 | 白底 + 色相 38% 描边 |
-| 左侧导轨 | 无 | 无 | 4px 阶段色相 |
-| 气质 | 有纸的层次 | 只靠发丝线 | 彩色、有活力 |
+| | `paper` | `calm` | `vivid`（灵动，默认） | `md3`（Material Design 3） |
+|---|---|---|---|---|
+| 阶段标题底 | 阶段色相 14% | 透明 | 阶段色相 24% | 阶段色相 16% + 胶囊计数/编号 |
+| 卡片 | 墨色 3% + 发丝环 | 同左 | 白底 + 色相 38% 描边 | `16px` 大圆角色调容器 + 柔光投影 |
+| 左侧导轨 | 无 | 无 | 4px 阶段色相 | 进行中行带 `4px` 胶囊竖条 |
+| 气质 | 有纸的层次 | 只靠发丝线 | 彩色、有活力 | M3 Tonal Surface、胶囊按钮与圆角行状态层 |
 
 ## 动效（2026-11-22，第二轮）
 
@@ -64,7 +64,6 @@
 2. **折叠/展开**：阶段与子项内容不再卸载，而是放进 `grid-template-rows: 0fr ↔ 1fr` 的容器（内容 `overflow:hidden;min-height:0`），收起和展开**双向**都有 0.24s 高度动画；收起时给容器 `inert`，键盘不会聚焦到看不见的行。
 3. **拖动**：被拖的行降到 40% 透明并轻微缩小；落位后其它行做 **FLIP**——渲染后量一次每行的 	op，与上一帧比，先把位置差用 	ranslateY 抵回去，再在 0.22s 内回到 0，所以重排是「让位」而不是「跳过去」。跨阶段移动也在内（按 data-item 找行，不局限于一个阶段）。
 4. **删除**：确认删除时该行立刻带 `data-removing`，0.26s 内左移、淡出并把 `max-height` 收到 0；等文件落盘后节点才真正消失（写失败则 400ms 后清标记，行留下）。
-4. **删除**：确认删除时该行立刻带 data-removing，0.26s 内左移、淡出并把 max-height 收到 0，等文件落盘后节点才真正消失（写失败则 400ms 后清掉标记，行留下）。
 
 做法参考：`grid-template-rows` 折叠是 CSS-Tricks 的 auto-height 手风琴（[CSS Grid Can Do Auto Height Transitions](https://css-tricks.com/css-grid-can-do-auto-height-transitions/)）与 [ariakit 的 animated disclosure](https://github.com/ariakit/ariakit/blob/9ac234b3290c4204889dba0acea25a6505811159/examples/disclosure-animated/readme.md)；勾选用的是「底色先填、勾线随后 draw」的配方（[transitions-dev 的 checkbox check](https://github.com/skillmds/skillmd/blob/0bcefc62f7295a9cad8220dfd8701c4415904c95/plugins/docs-writing/skills/transitions-dev/25-checkbox-check.md)）。
 
