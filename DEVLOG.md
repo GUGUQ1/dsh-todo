@@ -563,3 +563,60 @@ const cwd = exec.agent === undefined ? undefined : await ctx.workingDirectory.en
 **改动**：README 中英首段各加一段定位说明；`docs/USAGE.md` 开头加一句；`docs/AGENT.md` 新增「先记住它是什么」——明确"看到未完成事项不等于要现在做"；`package.json` 的 description 与 GitHub 仓库描述一并改成 shared plan board 口径。
 
 **注意**：`docs/AGENT.md` 是注册成技能 `dsh-todo-plan` 的运行时文档，**改完要重启 DSH** 才会进入助手的技能内容。
+
+## 2026-11-24 · 0.2.0：两块板（工作区公板 + 本会话私板）
+
+**目标**：面板要能同时显示和使用两块板——跟着工作区的公板、跟着会话的私板。用户定的规则：打开开关**不建任何东西**；两块都没有就显示「还没有任务板」；哪块存在显示哪块，同时存在就都显示；私板跟着会话走（跨工作区也跟）；别的会话的私板**只能读**（只读入口只给助手工具，面板不列别人的板）；面板布局用**两个常驻页签**。
+
+**数据**
+- 公板照旧：`<工作区>/todolist.json`。
+- 私板：`$DSH_HOME/dsh-todo/<会话id>/private.json`。`$DSH_HOME` 按 DSH 自己的规则解析（环境变量 → `~/.dsh`，`~` 展开）。会话 id 必须是 `^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`，否则不给路径。
+- 不建索引表：路径只由 id 推导；别的会话的私板按 id 直接定位。
+
+**改动**
+- 新增 `host/boards.js`：home 解析、id 白名单、私板路径、`fileExists`（坏文件也算存在，好让面板给修复入口）。
+- `index.js`：`resolveBoards` / `pickBoard`（显式 → 当前页签 → 唯一存在的板 → 报错）；命令新增 `boards` / `active` 与 `board:"private"` 的写路径；工具新增 `board` 参数与 `session:<id>` 只读；写不存在的板会先建它；通知文案带板名；系统提示与工具描述改成两块板。
+- `host/plan.js`：`writePlanFile` 写前 `mkdir -p` 私板目录。
+- `client.js`：`TodoBody` 变成壳（页签 + `boards` 查询 + 两个新建），原 `TodoBody` 改名 `BoardBody` 并接受 `board` / `privatePath` / `otherExists`；私板用同一条只读 Remote 读绝对路径 + `changes` + 4 秒兜底重读；页签按会话记在 `localStorage`，切页签推 `active` 给宿主；空态按「这块板」分开，两块都没有时合并成一张卡片；新增 `BoardTabs` / `BothEmpty` 与页签样式。
+- 文档：`SPEC.md`（两块板、`board` 字段、三条新命令、工具表、页签规则）、`docs/ARCHITECTURE.md`（为什么私板放 DSH_HOME、为什么不用 search、为什么还要兜底重读）、`docs/AGENT.md`（怎么选板、别的会话只读、开关不建板）、`SECURITY.md` / `docs/PRIVACY.md`（写入面收敛为两处）、`README` 中英、`docs/USAGE.md`、`docs/FAQ.md`、`CHANGELOG.md`、`DECISIONS.md`（ADR-0019…0022）。
+- 测试：新增 `tools/board-test.mjs`（路径规则、id 白名单、`boards`/`active`/私板写、页签默认、两块都有的拒绝、写时建板、跨会话只读与非法 id）；`tools/smoke-client.mjs` 补页签/空态/壳渲染断言，React 替身补 `useCallback`；`package.json` 的 `test` 串进新套件，版本升 `0.2.0`。
+
+**验证**
+- `node --check`：`index.js`、`host/plan.js`、`host/boards.js`、`client.js` 全通过。
+- 五套测试全绿：`plan-store 35 passed`、`board tests: OK`、`command tests: OK`、`tool/skill tests: OK`、`client smoke check: OK`。
+- 视觉自检：临时预览工程新增 `tabs-*` 七个场景（两页签 + 公板/私板/两侧空态 + 深色），截图逐个看过。
+- **没验证到的**：真机里 DSH 工作区文件服务读取 `~/.dsh` 下私板（读权按源码允许工作区外文件，但没有在真机跑过）、宿主新代码需要**重启 DSH** 才生效。这两项等重启后补端到端截图。
+
+**下一轮候选**
+- 跨工作区公板只读 + 「复制到我的板」（复制时重发 id，ADR-0021 的复制侧）。
+- 私板导出到工作区（补上 ADR-0019 的代价）。
+
+### 真机端到端（重启 DSH 后，2026-11-24 21:5x）
+
+- `todolist read`（不带 board）→ 返回 `【工作区公板】` + 末尾「另一块板：本会话私板（还没有）」；说明宿主按面板推上来的页签（public）解析成功。
+- `create board=private` → 生成 `C:\Users\30343\.dsh\dsh-todo\session-640de9f4-…\private.json`（rev 1），文件内容与格式校验一致。
+- 分别 `add board=private` / `add board=public` → 两块板的文件各自 rev+1，内容对得上（私板 rev 2、公板 rev 252）。
+- `read board=session:<本会话 id>` → 返回「【另一个会话的私板 · 只读】」；`add board=session:<id>` 被拒（「别的会话的私板只能读」）；`board=session:../../etc` 被拒（「会话 id 不合法」）。
+- 开关没打开时的第一次调用被拒（「本会话没有启用计划面板」），即重启后默认仍是关。
+- 真机发现并修掉两处：`recordStatus` 三个注册结果并发写互相覆盖（现在排队写）；面板只在挂载时问一次 `boards`，助手新建的板要重开面板才出现（现在切页签与窗口聚焦时都重新问）。
+
+**真机首屏的坏味道**：面板显示「项目计划 / `"undefined" is not valid JSON`」。原因不是 hosts，而是客户端读命令结果取错了层级——`ctx.remote.commands.execute` 返回 `{ ok, value: CommandExecution }`，处理函数自己的答案在 `value.result` 里；旧代码读 `value.kind` / `value.text`，于是**所有命令失败都被当成成功**（写入失败的红条从来不亮，`stale` 被静默吞掉），而 `boards` 的 JSON 拿到的是 `undefined`。修了 `failureOf` / 新增 `resultText`，并在 `smoke-client` 里对「成功 / error 结果 / 传输失败 / 无执行结果」四种形状写了断言（同时兼容旧形状，测试替身不用改）。顺带发现并修掉了 `recordStatus` 并发写互相覆盖。
+
+## 2026-11-24 · 默认外观改 md3（+ 两块板的真机收尾）
+
+**用户的决定**：md3 写一句介绍、排到设置页第一个、设为默认。
+
+**改动**
+- `host/plan.js`：`STYLES = ['md3', 'vivid', 'paper', 'calm']`（顺序即设置页顺序），`emptyPlan` 与 `validatePlan` / `repairPlan` 的兜底都改成 `STYLES[0]`。
+- `client.js`：`STYLE_MODES` 顺序改成 md3 在前；`normalizePlan` 与三处 `data-style` / 选中态兜底改 `md3`；补 `panel.style.md3.desc` 中英文案（"Material Design 3：大圆角色调容器、胶囊徽章与状态层，克制而干净。"）。
+- `index.js`：工具 `style` 枚举与描述改成 md3 在前、标注默认。
+- 文档：SPEC / DESIGN（外观表重排 + 默认说明）/ README 中英 / USAGE / FAQ / AGENT 速查 / CHANGELOG / DECISIONS（ADR-0023，并把 ADR-0015 标注为被取代）。
+- 测试：`plan-store` 三处默认值断言、`smoke-client` 的"默认选中 + 第一个按钮 + 面板 data-style"改成 md3。
+
+**真机两块板收尾**（同一天早些时候）
+- 助手建私板 / 写两块板 / 跨会话只读 / 非法 id 拒绝 全部按预期。
+- 用户在面板里勾了私板那条 → 文件 `rev 4`、状态 completed，且通知是「用户在本会话私板上把…」；**面板 → 命令（board=private）→ 私板文件** 这条链路通了。
+- 首屏 `"undefined" is not valid JSON` 的根因已修：命令结果在 `value.result` 里。
+
+**没验证到的**：md3 作为默认后的浅色/深色观感（截图已重出，但真机上是用户环境里的 md3），以及老文件（显式写过 `vivid`）升级后是否保持原样——逻辑上保持，没真机跑。
+- 删掉 `docs/preview.svg`（早期手绘示意图，画的是没有页签的旧面板）；`docs/DETAIL.md` 的首图改用真实截图 `docs/images/panel-tabs.png`，因此它不再被任何文件引用。历史轮次里提到它的那行保留不动（那是对当时状态的记录）。

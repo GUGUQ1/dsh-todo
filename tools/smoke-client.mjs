@@ -35,6 +35,7 @@ const React = {
   useRef(initial) { return { current: initial } },
   useEffect() {},
   useLayoutEffect() {},
+  useCallback(fn) { return fn },
 }
 
 let loaded
@@ -149,6 +150,20 @@ function text(node) {
 const { buildUi, normalizePlan } = mod.__test
 const ui = buildUi(ctx)
 
+// `commands.execute` answers `{ ok, value: CommandExecution }`, and the handler's
+// own answer is `value.result`. Reading `value.kind` made every failure look like
+// a success and handed `undefined` to the caller — the first real page load showed
+// `"undefined" is not valid JSON` in the empty state.
+const execution = result => ({ ok: true, value: { commandId: 'c1', result } })
+assert.equal(ui.failureOf(execution({ kind: 'success', text: '已保存' })), undefined, 'a success is not a failure')
+assert.equal(ui.failureOf(execution({ kind: 'error', text: 'stale: 文件已变化' })), 'stale: 文件已变化',
+  'an error result carries its text')
+assert.equal(ui.failureOf({ ok: false, error: { message: '命令调用失败' } }), '命令调用失败', 'a transport failure is a failure')
+assert.equal(ui.failureOf({ ok: true, value: undefined }), '命令没有执行（未知命令？）', 'a missing execution is a failure')
+assert.equal(ui.resultText(execution({ kind: 'success', text: '{"public":{}}' })), '{"public":{}}', 'success text is readable')
+assert.equal(ui.resultText(execution({ kind: 'success' })), undefined, 'a success may carry no text')
+assert.equal(ui.resultText({ ok: false, error: { message: 'x' } }), undefined, 'a transport failure has no text')
+
 const samplePlan = {
   version: 1,
   rev: 7,
@@ -250,7 +265,8 @@ assert.ok(findAll(ready, 'data-action').some(node => node.props['data-action'] =
 assert.ok(findAll(ready, 'data-action').some(node => node.props['data-action'] === 'clear-due'), 'a row with a date can clear it')
 
 const creating = text(render(React.createElement(ui.PlanPanel, { state: { kind: 'missing' }, view: {}, handlers })))
-assert.ok(creating.includes('创建计划'), 'the empty state offers to create the plan')
+assert.ok(creating.includes('新建公板'), 'the empty tab offers to create its own board')
+assert.ok(creating.includes('这个工作区还没有公板'), 'a missing board names which one is missing')
 
 assert.ok(shown.includes('进行中'), 'the focus block names the current item')
 assert.ok(shown.includes('下一步'), 'the focus block names the next item')
@@ -278,8 +294,9 @@ assert.deepEqual(calls.at(-1), ['page', 'plan'], 'the back control returns to th
 // Appearance: four looks plus an independent materials switch.
 const styleChoices = findAll(settings, 'data-action').filter(node => String(node.props['data-action']).startsWith('style-'))
 assert.equal(styleChoices.length, 4, 'all four looks are offered')
-assert.equal(styleChoices.find(node => node.props['data-action'] === 'style-vivid').props['aria-pressed'], true,
-  'vivid is the pressed default')
+assert.equal(styleChoices.find(node => node.props['data-action'] === 'style-md3').props['aria-pressed'], true,
+  'md3 is the pressed default')
+assert.equal(styleChoices[0].props['data-action'], 'style-md3', 'the default look is listed first')
 styleChoices.find(node => node.props['data-action'] === 'style-md3').props.onClick()
 assert.deepEqual(calls.at(-1), ['style', 'md3'], 'picking md3 asks for it')
 styleChoices.find(node => node.props['data-action'] === 'style-calm').props.onClick()
@@ -288,7 +305,7 @@ const materialSwitch = findAll(settings, 'data-action').find(node => node.props[
 assert.equal(materialSwitch.props['aria-checked'], true, 'materials are on by default')
 materialSwitch.props.onClick()
 assert.deepEqual(calls.at(-1), ['material', false], 'the materials switch asks for the opposite')
-assert.equal(findAll(ready, 'data-style')[0].props['data-style'], 'vivid', 'the panel carries its look')
+assert.equal(findAll(ready, 'data-style')[0].props['data-style'], 'md3', 'the panel carries its look')
 assert.equal(findAll(ready, 'data-material')[0].props['data-material'], 'on', 'the panel carries the materials flag')
 
 const hidden = render(React.createElement(ui.PlanPanel, {
@@ -375,7 +392,55 @@ assert.ok(planProblems({
 
 
 const missing = text(render(React.createElement(ui.PlanPanel, { state: { kind: 'missing' } })))
-assert.ok(missing.includes('还没有计划'), 'missing file shows the empty state')
+assert.ok(missing.includes('这个工作区还没有公板'), 'missing file shows the empty state')
+
+// The two boards are separate empty states, and the private one says so.
+const privateMissing = text(render(React.createElement(ui.PlanPanel, {
+  state: { kind: 'missing' },
+  view: { board: 'private', otherExists: true },
+  handlers,
+})))
+assert.ok(privateMissing.includes('这个对话还没有私板'), 'the private tab names the conversation')
+assert.ok(privateMissing.includes('新建私板'), 'the private tab creates the private board')
+assert.ok(privateMissing.includes('工作区'), 'it points at the other tab')
+
+// Tabs: both are always there, and the empty one is marked but still clickable.
+const picked = []
+const tabs = render(React.createElement(ui.BoardTabs, {
+  boards: { public: { exists: false }, private: { exists: true } },
+  active: 'private',
+  onPick: board => picked.push(board),
+}))
+const tabButtons = findAll(tabs, 'data-action').filter(node => String(node.props['data-action']).startsWith('board-tab-'))
+assert.deepEqual(tabButtons.map(node => node.props['data-action']), ['board-tab-public', 'board-tab-private'],
+  'both board tabs render')
+assert.equal(tabButtons[0].props['data-empty'], 'true', 'a board that does not exist is marked empty')
+assert.equal(tabButtons[1].props['data-empty'], 'false')
+assert.equal(tabButtons[1].props['aria-selected'], true, 'the active tab is selected')
+tabButtons[0].props.onClick()
+assert.deepEqual(picked, ['public'], 'clicking a tab asks for that board')
+
+// Neither board exists: one card, both starts.
+const created = []
+const both = text(render(React.createElement(ui.BothEmpty, {
+  busy: undefined,
+  error: undefined,
+  onCreate: board => created.push(board),
+})))
+assert.ok(both.includes('还没有任务板'), 'the both-empty card explains the situation')
+assert.ok(both.includes('新建公板') && both.includes('新建私板'), 'both creates are offered')
+const bothNode = render(React.createElement(ui.BothEmpty, { onCreate: board => created.push(board) }))
+const bothButtons = findAll(bothNode, 'data-action').filter(node => String(node.props['data-action']).startsWith('create-'))
+assert.equal(bothButtons.length, 2, 'two create buttons')
+bothButtons[1].props.onClick()
+assert.deepEqual(created, ['private'], 'the second button creates the private board')
+
+// The shell always renders both tabs, whatever the Host has answered so far.
+const shell = render(React.createElement(ui.TodoBody, { sessionId: 's-shell' }))
+assert.equal(findAll(shell, 'data-action').filter(node => String(node.props['data-action']).startsWith('board-tab-')).length, 2,
+  'the tab shell shows both boards before any load')
+assert.ok(findAll(shell, 'className').some(node => String(node.props.className).includes('dsh-todo-page')),
+  'the shell keeps one scrollable page for the board')
 
 const invalid = text(render(React.createElement(ui.PlanPanel, {
   state: { kind: 'invalid', message: 'version 必须是 1' },

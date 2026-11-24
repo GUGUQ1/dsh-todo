@@ -1,6 +1,6 @@
 {
   "name": "dsh-todo",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "description": "A shared plan board for you and the agent in the DeepSeek Harness right sidebar: stages, dependencies, due dates, and a passive reminder of where the work stands.",
   "license": "MIT",
@@ -22,7 +22,7 @@
     "sidebar"
   ],
   "scripts": {
-    "test": "node tools/plan-store-test.mjs && node tools/command-test.mjs && node tools/tool-test.mjs && node tools/smoke-client.mjs",
+    "test": "node tools/plan-store-test.mjs && node tools/board-test.mjs && node tools/command-test.mjs && node tools/tool-test.mjs && node tools/smoke-client.mjs",
     "check-session": "node tools/session-check.mjs"
   },
   "exports": {

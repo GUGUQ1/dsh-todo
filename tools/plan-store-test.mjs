@@ -425,9 +425,9 @@ await test('applyOpAndWrite 的 repair 走读原始文件的通道', async () =>
   }
 })
 
-await test('外观：默认灵动 + 高级材质开；非法值被拒；修复回默认', () => {
+await test('外观：默认 Material Design + 高级材质开；非法值被拒；修复回默认', () => {
   const plan = validatePlan(sample()).plan
-  assert.equal(plan.ui.style, 'vivid', 'vivid is the default look')
+  assert.equal(plan.ui.style, 'md3', 'md3 is the default look')
   assert.equal(plan.ui.material, true, 'materials default on')
   assert.equal(applyOp(plan, { op: 'settings', style: 'calm' }).plan.ui.style, 'calm')
   assert.equal(applyOp(plan, { op: 'settings', style: 'md3' }).plan.ui.style, 'md3')
@@ -441,7 +441,7 @@ await test('外观：默认灵动 + 高级材质开；非法值被拒；修复�
   broken.ui.material = 'yes'
   assert.equal(validatePlan(broken).ok, false, 'an unknown look is rejected on read too')
   const repaired = repairPlan(broken)
-  assert.equal(repaired.plan.ui.style, 'vivid', 'repair falls back to vivid')
+  assert.equal(repaired.plan.ui.style, 'md3', 'repair falls back to the default look')
   assert.equal(repaired.plan.ui.material, true, 'repair falls back to materials on')
 })
 

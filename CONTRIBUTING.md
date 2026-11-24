@@ -4,10 +4,11 @@
 
 | 路径 | 是什么 |
 |---|---|
-| `index.js` | 宿主半边：`/todo` 命令、模型工具 `todolist`、给助手的技能、通知注入 |
+| `index.js` | 宿主半边：`/todo` 命令、模型工具 `todolist`、给助手的技能、通知注入、两块板的路径判定 |
 | `host/plan.js` | 计划文件的模型：校验、操作、`repair`、原子写 |
-| `client.js` | 浏览器半边：右栏页签、面板 UI、拖拽、设置页（单文件，无构建） |
-| `tools/*.mjs` | 四套测试，纯 Node，不需要 DSH 在跑 |
+| `host/boards.js` | 板在哪：`$DSH_HOME` 解析、会话 id 白名单、私板路径推导 |
+| `client.js` | 浏览器半边：右栏页签（两个板页签）、面板 UI、拖拽、设置页（单文件，无构建） |
+| `tools/*.mjs` | 五套测试，纯 Node，不需要 DSH 在跑 |
 | `docs/` | 用户文档、给助手的说明、架构与兼容性 |
 | `locale/*.json` | 只有插件管理页的元数据（标题/描述）；面板文案在 `client.js` 的 `zh` / `en` 字典里 |
 
@@ -15,12 +16,13 @@
 
 ```bash
 node tools/plan-store-test.mjs   # 文件模型：校验、操作、repair、原子写
+node tools/board-test.mjs        # 两块板：路径规则、页签默认、跨会话只读
 node tools/command-test.mjs      # 宿主命令、三种通知、创建
 node tools/tool-test.mjs         # 模型工具与技能注册
 node tools/smoke-client.mjs      # 面板渲染冒烟（假 React + 假 ctx）
 ```
 
-`npm test` 依次跑这四套。
+`npm test` 依次跑这五套。
 
 装进本机 DSH 调试（见 [docs/INSTALL.md](docs/INSTALL.md#方式三手动改-profile开发期)）：用 `link:` 指到仓库。
 
@@ -59,7 +61,7 @@ node tools/smoke-client.mjs      # 面板渲染冒烟（假 React + 假 ctx）
 ## 提 PR
 
 - 说明**为什么**要改，而不只是改了什么；
-- 贴出跑过的命令与结果（四套测试的输出）；
+- 贴出跑过的命令与结果（五套测试的输出）；
 - 涉及界面时附截图（浅色/深色各一张更好）；
 - 没验证到的部分请明说。
 

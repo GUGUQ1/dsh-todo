@@ -4,23 +4,46 @@
 
 ```
 ┌────────────────────────── 浏览器（client.js） ──────────────────────────┐
-│ 右栏页签 + 面板 UI + 拖拽 + 设置页                                       │
+│ 右栏页签：两个板页签（工作区 / 本会话）+ 面板 UI + 拖拽 + 设置页         │
 │   ├─ 读：remote.workspaceFiles.read / search / changes（只读 + 订阅）    │
+│   │      私板用同一接口、传绝对路径；search 只用于公板                   │
 │   └─ 写：remote.commands.execute('/todo op <json>')                     │
 └────────────────────────────────┬────────────────────────────────────────┘
                                  │ 命令
 ┌────────────────────────────────▼────── 宿主（index.js） ───────────────┐
-│ /todo 命令 → 校验载荷与路径 → applyOpAndWrite                            │
+│ /todo 命令 → 判定 board → 校验载荷与路径 → applyOpAndWrite               │
+│ 板路径解析：公板 planCwd + resolvePlanFile；私板只由会话 id 推导         │
 │ 模型工具 todolist（自己构造定义，服务就绪后注册）                        │
 │ 运行时技能 dsh-todo-plan（docs/AGENT.md）                                │
-│ 通知：把改动作为一条用户消息注入会话（三档 + 合并窗口）                  │
+│ 通知：把改动作为一条用户消息注入会话（三档 + 合并窗口 + 板名）           │
 └────────────────────────────────┬────────────────────────────────────────┘
                                  │ 读写
 ┌────────────────────────────────▼──────────── host/plan.js ─────────────┐
 │ validatePlan（严格校验）· applyOp（操作集）· repairPlan（自救）          │
 │ readPlanFile / writePlanFile（原子写、rev+1、写前 version 比对）         │
 └─────────────────────────────────────────────────────────────────────────┘
+                                 ▲
+                    host/boards.js：$DSH_HOME 解析、会话 id → 私板路径
 ```
+
+## 两块板
+
+| | 公板 | 私板 |
+|---|---|---|
+| 文件 | `<工作区>/todolist.json` | `$DSH_HOME/dsh-todo/<会话id>/private.json` |
+| 谁决定路径 | 会话工作区（`workingDirectory`）+ 搜索 | 只有会话 id（`host/boards.js`） |
+| 面板怎么读 | 相对路径 + `search` 兜底 | 宿主给绝对路径，直接 `read` |
+| 面板怎么刷新 | 文件 `changes` 订阅 | `changes` 订阅 + 4 秒兜底重读 |
+| 换工作区 | 换了一块板 | 还是那一块 |
+
+**为什么私板放 `$DSH_HOME` 而不是工作区**：私板锚的是会话。会话的工作目录会变（`workingDirectory`、worktree），放工作区就得再记一份「当初建在哪个工作区」的指针，而且会话换到 B 工作区后写私板等于往 A 的目录里写——正是「跨工作区只能读或复制」要避免的。放用户数据目录里，路径只由 id 推导，没有指针、没有跨工作区写。
+
+**为什么私板不用 `search`**：DSH 的工作区文件服务对**文件**的读写权限不限于工作区（`read` / `stat` / `changes`），只有目录列举和搜索是工作区范围的。私板是已知的绝对路径，正好落在允许的那一半。
+
+**为什么还要 4 秒兜底重读**：私板在工作区外，`changes` 可能静默不开（没有错误，只是没有事件）。兜底用 `read`——它不是命令，不会往会话日志里写任何东西；`rev` 没变就不重渲染。
+
+**为什么页签状态推给宿主**：工具需要知道「用户正看着哪块板」才能把「加一条」落到对的地方。宿主记 `Map<sessionId, board>`，只由用户点页签时更新；两块都在又没有这一信息时，工具宁可报错让助手问一句。
+
 
 ## 为什么这么分
 
@@ -61,17 +84,18 @@ composer 开关 ──localStorage──> 浏览器记住状态
 
 ### 读
 
-1. 面板用 `workspaceFiles.read` 读工作区根目录的 `todolist.json`；
-2. 没有就 `search` 找同名文件，取层级最浅的；
-3. 对这个路径开 `changes` 订阅（根目录那条一直保留），150ms 去抖后重读；
-4. 页脚显示实际路径与 `rev`。
+1. 面板先用 `{"op":{"op":"boards"}}` 问宿主两块板的绝对路径与是否存在（页签与空态都靠它）；
+2. 公板：`workspaceFiles.read` 读工作区根目录的 `todolist.json`，没有就 `search` 找同名文件取层级最浅的；
+3. 私板：直接 `read` 那条绝对路径，不搜索；
+4. 对读到的路径开 `changes` 订阅（公板另保留根目录那条），150ms 去抖后重读；私板另有 4 秒兜底重读；
+5. 页脚显示板的位置与 `rev`。
 
 ### 写
 
-1. 面板发 `/todo op {"path":"…","op":{…}}`；
-2. 宿主校验：`op` 必须是对象、basename 必须是 `todolist.json`、路径必须在会话工作区内；
-3. `applyOpAndWrite`：读 → 校验 → 应用一个操作 → `rev + 1` → 临时文件 + rename；
-4. 成功后按 `ui.notify` 通知助手；文件变化再触发第 1 步的重读。
+1. 面板发 `/todo op {"path":"…","op":{…}}`（公板）或 `/todo op {"board":"private","op":{…}}`（私板）；
+2. 宿主校验：`op` 必须是对象；`board: "private"` 时路径由会话 id 推导（拿不到 id 就拒绝），否则 basename 必须是 `todolist.json` 且路径必须在会话工作区内；
+3. `applyOpAndWrite`：读 → 校验 → 应用一个操作 → `rev + 1` → 临时文件 + rename（父目录不存在就先建）；
+4. 成功后按 `ui.notify` 通知助手（带板名）；文件变化再触发第 1 步的重读。
 
 ### 通知
 
@@ -87,10 +111,11 @@ composer 开关 ──localStorage──> 浏览器记住状态
 
 | 文件 | 关心什么 |
 |---|---|
-| `client.js` | 面板的一切：字典、样式、组件、拖拽状态机、设置页、`planProblems` |
-| `index.js` | 命令、工具、技能、通知、路径校验、服务查找（`toolsService` / `skillsService` / `planCwd`） |
+| `client.js` | 面板的一切：字典、样式、组件、两个页签的壳、拖拽状态机、设置页、`planProblems` |
+| `index.js` | 命令、工具、技能、通知、两层路径校验、服务查找（`toolsService` / `skillsService` / `planCwd`） |
 | `host/plan.js` | 格式与规则：`validatePlan`、`applyOp`、`repairPlan`、`readPlanFile`、`writePlanFile`、`applyOpAndWrite` |
-| `tools/*.mjs` | 四套无依赖测试 |
+| `host/boards.js` | 板在哪：`$DSH_HOME` 解析、会话 id 白名单、私板路径推导 |
+| `tools/*.mjs` | 五套无依赖测试（含 `board-test.mjs`） |
 | `docs/AGENT.md` | 给助手的使用约定（同时注册成技能） |
 
 ## 常见的改动位置
@@ -98,8 +123,10 @@ composer 开关 ──localStorage──> 浏览器记住状态
 | 想改 | 改哪 |
 |---|---|
 | 面板样式/布局 | `client.js` 的 `STYLE` 与组件 |
+| 页签与空态 | `client.js` 的 `TodoBody`（壳）/ `BoardTabs` / `BothEmpty` |
 | 新操作 | `host/plan.js` 的 `applyOp` + `index.js` 的 `describeOp`/工具分支 + `SPEC.md` |
 | 校验规则 | `host/plan.js` 的 `validatePlan`（读与写都会用）+ `client.js` 的 `planProblems`（提示用） |
+| 板放在哪 | `host/boards.js` |
 | 通知策略 | `index.js` 的 `notifyAgent` |
 | 给助手的约定 | `docs/AGENT.md`（技能内容从这份文件读） |
 
@@ -110,8 +137,10 @@ composer 开关 ──localStorage──> 浏览器记住状态
 | 面板空白 | 客户端 factory 抛错（`smoke-client.mjs` 能抓到大部分） |
 | 面板正常但点了没反应 | 文件里有不合法行 → 全部写入被拒；面板顶部会有黄色提示 |
 | 面板正常但改不动、也没有提示 | 宿主命令没注册（旧版本）或路径校验拒绝（看红条） |
+| 私板页签一直空 | `$DSH_HOME` 解析不对（环境变量空/指向别处）、会话 id 不合法，或板确实没建 |
 | 助手看不见工具 | 注册失败或 `tools` 服务未就绪；查 `%TEMP%\dsh-todo-tool-status.json` |
 | 助手看不到计划内容 | 工作区解析不到（`workingDirectory`）；工具会明确报「拿不到会话工作区」 |
+| 助手说「各有一块板」 | 两块都在、用户又没指定，工具按设计要求问一句 |
 
 ## 外观与动效怎么落地（0.1.0 起）
 

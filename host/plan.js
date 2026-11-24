@@ -7,7 +7,8 @@
  * two callers cannot drift apart.
  */
 import { randomBytes } from 'node:crypto'
-import { readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 
 /** Default file name inside a workspace. */
 export const PLAN_FILE = 'todolist.json'
@@ -30,8 +31,8 @@ const CHILD_KEYS = new Set(['id', 'title', 'status'])
 /** How the Host tells the agent about a panel edit. */
 export const NOTIFY_MODES = ['next-turn', 'wake', 'off']
 
-/** Panel looks the user can pick between. */
-export const STYLES = ['paper', 'calm', 'vivid', 'md3']
+/** Panel looks the user can pick between; the first one is the default. */
+export const STYLES = ['md3', 'vivid', 'paper', 'calm']
 
 /**
  * A fresh, empty plan.
@@ -43,7 +44,7 @@ export function emptyPlan(title = '') {
     version: PLAN_VERSION,
     rev: 0,
     title,
-    ui: { hideCompleted: false, openRequest: 0, notify: 'next-turn', notifyWindow: 8, style: 'vivid', material: true, next: null },
+    ui: { hideCompleted: false, openRequest: 0, notify: 'next-turn', notifyWindow: 8, style: 'md3', material: true, next: null },
     groups: [],
     items: [],
   }
@@ -184,7 +185,7 @@ export function validatePlan(value) {
         openRequest: ui.openRequest ?? 0,
         notify: ui.notify ?? 'next-turn',
         notifyWindow: ui.notifyWindow ?? 8,
-        style: STYLES.includes(ui.style) ? ui.style : 'vivid',
+        style: STYLES.includes(ui.style) ? ui.style : STYLES[0],
         material: ui.material ?? true,
         next: ui.next ?? null,
       },
@@ -388,8 +389,8 @@ export function repairPlan(value) {
   }
   const next = typeof rawUi.next === 'string' && itemIds.has(rawUi.next) ? rawUi.next : null
   if (typeof rawUi.next === 'string' && next === null) notes.push('「下一步」指向的事项不存在，已清掉')
-  if (rawUi.style !== undefined && !STYLES.includes(rawUi.style)) notes.push('ui.style 不合法，已改成 vivid')
-  const style = STYLES.includes(rawUi.style) ? rawUi.style : 'vivid'
+  if (rawUi.style !== undefined && !STYLES.includes(rawUi.style)) notes.push('ui.style 不合法，已改成 ' + STYLES[0])
+  const style = STYLES.includes(rawUi.style) ? rawUi.style : STYLES[0]
   if (rawUi.material !== undefined && typeof rawUi.material !== 'boolean') {
     notes.push('ui.material 不合法，已重置为 true')
   }
@@ -852,6 +853,9 @@ export async function writePlanFile(file, plan, { expectedVersion } = {}) {
   if (!checked.ok) return { ok: false, error: `invalid-plan: ${checked.errors.join('; ')}` }
   const temp = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
   try {
+    // A private board lives in its own directory under the Harness home, which
+    // may not exist yet; the temp file and the rename both need it.
+    await mkdir(dirname(file), { recursive: true })
     await writeFile(temp, `${JSON.stringify(checked.plan, null, 2)}\n`, 'utf8')
     await rename(temp, file)
   } catch (error) {

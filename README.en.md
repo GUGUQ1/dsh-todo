@@ -2,9 +2,20 @@
 
 A project plan panel for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH): a right-sidebar tab that tracks cross-session work by stage, with dependencies and due dates.
 
-**It is closer to a whiteboard you share with the agent than to a task manager.** The panel schedules nothing, nags nobody and never starts work on its own — it is a note board in the right sidebar: you write down where things stand, the agent writes down where it stands, and both of you read the same board. **Within the same workspace**, come back in a few days or in another session and it still remembers which stage you were in (the data is that workspace's `todolist.json`; a different workspace is a different board).
+**It is closer to a whiteboard you share with the agent than to a task manager.** The panel schedules nothing, nags nobody and never starts work on its own — it is a note board in the right sidebar: you write down where things stand, the agent writes down where it stands, and both of you read the same board.
 
-<img width="380" src="docs/images/style-vivid.png" alt="The plan panel">
+The panel has **two tabs, two boards**:
+
+- **Workspace**: follows the workspace and is shared by every conversation in it (the data is that workspace's `todolist.json`, so it can live in git);
+- **This conversation**: follows the conversation, even when you change workspace (the data lives in DSH's user-data directory).
+
+Both can exist and be used at the same time. Whichever is missing offers a "New" button in its tab — **turning the switch on creates nothing**.
+
+Both can exist and be used at the same time. Whichever is missing offers a "New" button in its tab — **turning the switch on creates nothing**.
+
+<img width="380" src="docs/images/panel-tabs.png" alt="The Workspace / This conversation tabs"> <img width="380" src="docs/images/panel-both-missing.png" alt="Neither board exists yet">
+
+<img width="380" src="docs/images/style-md3.png" alt="The plan panel (default Material Design look)">
 
 ## Why another todo list
 
@@ -29,6 +40,7 @@ To say "I'm working on X" or "X is next", just tell the agent — it is already 
 
 ## Features
 
+- **Two boards, two tabs**: `Workspace` (shared, can live in git) and `This conversation` (follows the conversation). Both tabs are always there; an empty one offers its own "New" button, and when neither exists the panel says so once with both choices.
 - **Stage cards**, one hue each, with the current/next line always under the title; foldable with animated height; draggable as a whole.
 - **Sub-items** fold behind a triangle on the parent (`+N` when folded); the folded state persists locally.
 - **Drag to reorder** from the six-dot handle only. Hovering a row draws an insertion line, hovering empty space draws an "append here" line; releasing opens a confirmation bar at the bottom of the panel that reverts after 6 seconds; once confirmed, the other rows slide into place instead of jumping.
@@ -42,7 +54,7 @@ To say "I'm working on X" or "X is next", just tell the agent — it is already 
   <img width="380" src="docs/images/problem-banner.png" alt="A row the host would reject">
 
 - **Notifying the agent**: panel edits reach the agent in one of three modes — `next turn` (default, no interruption), `wake now`, or `do not notify`. Bursts merge into one notice within a window (8 seconds by default, configurable).
-- **Four looks**: `vivid` (default — coloured header, a 4px rail down each card, a matching outline), `md3` (Material Design 3: tonal containers, pill badges, white rounded row cards), `paper` (hued header with a paper-like grain), and `calm` (no hue, one hairline). Advanced materials (gradients, layered shadows, frosted glass) have their own switch so you can trade looks for speed.
+- **Four looks**: `md3` (default — Material Design 3: tonal containers, pill badges, large-radius row cards), `vivid` (coloured header, a 4px rail down each card, a matching outline), `paper` (hued header with a paper-like grain), and `calm` (no hue, one hairline). Advanced materials (gradients, layered shadows, frosted glass) have their own switch so you can trade looks for speed.
 
   <img width="380" src="docs/images/settings.png" alt="Settings page">
 
@@ -68,7 +80,7 @@ More (three installation routes, rollback, permissions): [docs/INSTALL.md](docs/
 
 Nothing to save — every panel action is applied immediately.
 
-**Each conversation has a switch** (next to the *Plan* chip above the composer), off by default: when it is on, the agent learns the panel exists and may use the `todolist` tool; when off, tool calls are refused and edits are not reported. The panel itself can always be opened for reading.
+**Each conversation has a switch** (next to the *Plan* chip above the composer), off by default: when it is on, the agent learns the panel exists and may use the `todolist` tool; when off, tool calls are refused and edits are not reported. The switch only gates *use* — turning it on creates no board. The panel itself can always be opened, read and edited.
 
 For "in progress" and "next", talk to the agent:
 
@@ -84,10 +96,14 @@ Full usage: [docs/USAGE.md](docs/USAGE.md). Troubleshooting: [docs/FAQ.md](docs/
 
 ## Where the data lives
 
-`todolist.json` in the workspace (the root first, then the shallowest match inside it). It can live in git, it diffs well, and the agent can read it with ordinary file tools.
+| Board | Location | Follows |
+|---|---|---|
+| Workspace board | `todolist.json` in the workspace (the root first, then the shallowest match inside it) | the workspace (can live in git) |
+| This conversation's board | `$DSH_HOME/dsh-todo/<session-id>/private.json` (`~/.dsh/…` by default) | the conversation, even across workspaces |
 
 - Writes are **atomic**: temp file + rename, `rev` increments, and the size/mtime seen at read time is compared before writing, so a concurrent edit is refused rather than overwritten.
-- The panel never writes files: every action goes through the host command `/todo op <json>` and is validated before it lands.
+- The panel never writes files: every action goes through the host command `/todo op <json>` and is validated before it lands. A private board's path is derived from the session id alone, never from a caller-supplied path.
+- Another conversation's private board is **read-only** for the agent (`board: "session:<id>"`); open that conversation yourself to change it.
 
 Format and operations: [SPEC.md](SPEC.md).
 
@@ -102,15 +118,16 @@ Format and operations: [SPEC.md](SPEC.md).
 ## Permissions and privacy
 
 - **No network**: the plugin makes no requests of its own.
-- **Reads** the workspace through DSH's read-only file remote.
-- **Writes** only files named `todolist.json` that live inside the session workspace.
-- **Injects** one user-role message per notice (for example "the user marked X as completed"); no custom session event types.
+- **Reads** through DSH's read-only file remote (that service allows single files outside the workspace, which is what the private board uses).
+- **Writes** only two places: a `todolist.json` inside the session workspace, and the one private file under `$DSH_HOME/dsh-todo/` that the plugin derives itself.
+- **Injects** one user-role message per notice (for example "the user marked X as completed on the workspace board"); no custom session event types.
 
 See [SECURITY.md](SECURITY.md) and [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ## Known limits
 
 - Sub-items carry only a title and a status — no due date, note, or nesting (format v1).
+- The private board lives in DSH's user-data directory: it is not in your project backup and not in git (copy it into the workspace if you want it there).
 - Stage counts cover top-level items only; children are not in the denominator.
 - One "next" at a time, while several items may be "in progress".
 - The panel cannot mark "in progress" itself; that is the point of the split above.
@@ -121,7 +138,8 @@ See [SECURITY.md](SECURITY.md) and [docs/PRIVACY.md](docs/PRIVACY.md).
 | File | Contents |
 |---|---|
 | [docs/INSTALL.md](docs/INSTALL.md) | Install, upgrade, uninstall, rollback |
-| [docs/USAGE.md](docs/USAGE.md) | Panel behaviour, notify modes |
+| [docs/USAGE.md](docs/USAGE.md) | Panel behaviour, the two tabs, notify modes |
+| [docs/DETAIL.md](docs/DETAIL.md) | One-paragraph intro and quick start (for listings) |
 | [docs/FAQ.md](docs/FAQ.md) | "Nothing happens when I click", "the agent cannot see the tool" |
 | [docs/AGENT.md](docs/AGENT.md) | Usage notes for agents (also registered as a skill) |
 | [SPEC.md](SPEC.md) | File format and operations |
@@ -138,12 +156,13 @@ See [SECURITY.md](SECURITY.md) and [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ```bash
 node tools/plan-store-test.mjs   # format, operations, atomic write
+node tools/board-test.mjs        # the two boards: paths, tab default, cross-session read
 node tools/command-test.mjs      # host command and notifications
 node tools/tool-test.mjs         # the model-facing tool
 node tools/smoke-client.mjs      # panel render smoke check
 ```
 
-All four are plain Node and need no running DSH. See [CONTRIBUTING.md](CONTRIBUTING.md) for installing into a profile and verifying in the UI.
+All five are plain Node and need no running DSH. See [CONTRIBUTING.md](CONTRIBUTING.md) for installing into a profile and verifying in the UI.
 
 ## License
 

@@ -41,12 +41,13 @@ profile 在 `~/.dsh/profiles/<profile>/`。在 `package.json` 里加一条依赖
 |---|---|
 | 右栏「开始」页 | 一张 **项目计划** 卡片（点它打开面板） |
 | 输入框上方 | 一个「计划」胶囊（临时入口，同样打开面板） |
+| 面板顶部 | 「工作区 / 本会话」两个页签（没有板的那一侧显示「新建」） |
 | 模型侧 | 工具列表里有 `todolist`；技能列表里有 `dsh-todo-plan` |
 
 模型侧的注册结果可以查 `%TEMP%\dsh-todo-tool-status.json`：
 
 ```json
-{"tool":{"ok":true,"name":"todolist","parameters":12,"at":"…"},"skill":{"ok":true,"name":"dsh-todo-plan","chars":…,"at":"…"}}
+{"tool":{"ok":true,"name":"todolist","parameters":18,"at":"…"},"prompt":{"ok":true,"name":"dsh-todo:session","at":"…"},"skill":{"ok":true,"name":"dsh-todo-plan","chars":…,"at":"…"}}
 ```
 
 `ok: false` 或文件里没有对应键，就是这个能力没注册上（见 [FAQ](FAQ.md#助手看不见-todolist-工具)）。
@@ -63,12 +64,16 @@ profile 在 `~/.dsh/profiles/<profile>/`。在 `package.json` 里加一条依赖
 - **卸载**：插件页移除 bundle；或手动从 profile 的 `dependencies` 与 `bundles` 里删掉，再 `pnpm install`。
 - **回滚到某个版本**：`git checkout <tag> -- .`（例如 `v0.1.0`），需要的话重新安装并重启。
 
-计划文件 `todolist.json` 属于你的工作区，卸载插件不会删除它。
+两块板都不会被卸载删掉：
+
+- 公板 `todolist.json` 属于你的工作区；
+- 私板在 `$DSH_HOME/dsh-todo/<会话id>/`（默认 `~/.dsh/…`），想清就自己删目录。
 
 ## 权限边界
 
 - 插件**不联网**。
-- 只读工作区文件；写入只允许 basename 为 `todolist.json`、且位于会话工作区内的文件。
-- 面板的每次改动会作为一条用户消息注入会话（三档通知可控）。
+- 读：DSH 的只读文件接口（单个文件不限工作区）。
+- 写：只有两处——会话工作区内的 `todolist.json`（basename + `realpath` 校验），和 `$DSH_HOME/dsh-todo/` 下由会话 id 推导出的那一个私板文件。
+- 面板的每次改动会作为一条用户消息注入会话（三档通知可控，并带上改的是哪块板）。
 
 更多见 [SECURITY.md](../SECURITY.md) 与 [PRIVACY](PRIVACY.md)。

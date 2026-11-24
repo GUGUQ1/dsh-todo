@@ -27,6 +27,8 @@ window.__ModuleLoader__.load({
     const PLAN_FILE = 'todolist.json'
     /** A change event rarely arrives alone; coalesce bursts before re-reading. */
     const REFRESH_DELAY_MS = 150
+    /** Safety re-read for the private board, whose watch is outside the workspace. */
+    const PRIVATE_POLL_MS = 4000
 
     const zh = {
       'type.label': '计划',
@@ -37,13 +39,28 @@ window.__ModuleLoader__.load({
       'chip.switchAria': '本会话是否使用项目计划面板',
       'chip.on': '本会话已启用计划面板（点开关停用）',
       'chip.off': '本会话未启用计划面板（点开关启用）',
-      'panel.offline': '本会话没有启用计划面板：助手读不到这份计划，也改不了它；这里的改动同样不会通知它。在输入框上方的「计划」开关里打开即可。',
+      'panel.offline': '本会话没有启用计划面板：助手读不到这些板，也改不了它们；这里的改动同样不会通知它。在输入框上方的「计划」开关里打开即可。',
       'panel.title': '项目计划',
       'panel.untitled': '未命名计划',
       'panel.done': '完成',
       'panel.loading': '正在读取计划…',
       'panel.stage': '阶段',
       'panel.file': '文件',
+      'panel.privateBoard': '本会话私板',
+      'tab.public': '工作区',
+      'tab.private': '本会话',
+      'tab.public.hint': '工作区公板：同一工作区的会话共用一块',
+      'tab.private.hint': '本会话私板：只跟着这个对话走，换工作区也还在',
+      'empty.both.title': '还没有任务板',
+      'empty.both.body': '这个工作区和这个对话都还没有任务板。公板跟着工作区走，私板跟着对话走；想用哪块就建哪块，只打开开关不会建。',
+      'empty.public.title': '这个工作区还没有公板',
+      'empty.public.body': '公板跟着工作区走，同一个工作区的会话都能用。',
+      'empty.private.title': '这个对话还没有私板',
+      'empty.private.body': '私板跟着这个对话走，换工作区也还在。',
+      'empty.createPublic': '新建公板',
+      'empty.createPrivate': '新建私板',
+      'empty.creating': '正在新建…',
+      'empty.otherTab': '另一块板在「{tab}」页签里。',
       'panel.hideCompleted': '隐藏已完成',
       'panel.showCompleted': '显示已完成',
       'panel.addItem': '添加事项',
@@ -79,7 +96,7 @@ window.__ModuleLoader__.load({
       'panel.style.vivid': '灵动',
       'panel.style.vivid.desc': '阶段色更饱满，卡片左侧一条彩色导轨，进行中更抢眼，配轻微动效。',
       'panel.style.md3': 'Material Design',
-      'panel.style.md3.desc': '',
+      'panel.style.md3.desc': 'Material Design 3：大圆角色调容器、胶囊徽章与状态层，克制而干净。',
       'panel.material': '高级材质',
       'panel.material.desc': '渐变、分层投影、毛玻璃与内高光。关掉只有纯色块，最省性能。',
       'panel.notify.nextTurn': '下一轮携带',
@@ -129,13 +146,28 @@ window.__ModuleLoader__.load({
       'chip.switchAria': 'Whether this conversation uses the project plan panel',
       'chip.on': 'The plan panel is on for this conversation (click to switch off)',
       'chip.off': 'The plan panel is off for this conversation (click to switch on)',
-      'panel.offline': 'The plan panel is off for this conversation: the agent cannot read or change this plan, and edits here are not reported to it. Switch it on in the Plan toggle above the composer.',
+      'panel.offline': 'The plan panel is off for this conversation: the agent cannot read or change these boards, and edits here are not reported to it. Switch it on in the Plan toggle above the composer.',
       'panel.title': 'Project plan',
       'panel.untitled': 'Untitled plan',
       'panel.done': 'Done',
       'panel.loading': 'Reading the plan…',
       'panel.stage': 'Stage',
       'panel.file': 'File',
+      'panel.privateBoard': 'This conversation',
+      'tab.public': 'Workspace',
+      'tab.private': 'This conversation',
+      'tab.public.hint': 'Workspace board: one board shared by every conversation in this workspace',
+      'tab.private.hint': 'This conversation\'s board: it follows the conversation, not the workspace',
+      'empty.both.title': 'No board yet',
+      'empty.both.body': 'Neither this workspace nor this conversation has a board yet. The workspace board follows the workspace, the private board follows the conversation; create whichever you want. Turning the switch on creates nothing.',
+      'empty.public.title': 'This workspace has no board yet',
+      'empty.public.body': 'The workspace board follows the workspace and is shared by every conversation in it.',
+      'empty.private.title': 'This conversation has no board yet',
+      'empty.private.body': 'The private board follows this conversation, even when you change workspace.',
+      'empty.createPublic': 'New workspace board',
+      'empty.createPrivate': 'New private board',
+      'empty.creating': 'Creating…',
+      'empty.otherTab': 'The other board is in the "{tab}" tab.',
       'panel.hideCompleted': 'Hide completed',
       'panel.showCompleted': 'Show completed',
       'panel.addItem': 'Add item',
@@ -171,7 +203,7 @@ window.__ModuleLoader__.load({
       'panel.style.vivid': 'Vivid',
       'panel.style.vivid.desc': 'Fuller stage colours, a coloured rail down each card, a louder active row, plus small motion.',
       'panel.style.md3': 'Material Design',
-      'panel.style.md3.desc': '',
+      'panel.style.md3.desc': 'Material Design 3: tonal rounded containers, pill badges and a calm state layer over each card.',
       'panel.material': 'Advanced materials',
       'panel.material.desc': 'Gradients, layered shadows, frosted glass and an inner highlight. Off is flat and cheapest to render.',
       'panel.notify.nextTurn': 'Next turn',
@@ -378,6 +410,26 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-primary);cursor:pointer}
 .dsh-todo-action-button:hover{background:var(--dsw-alias-bg-layer-2)}
 .dsh-todo-action-button:disabled{opacity:.5;cursor:default}
+.dsh-todo-empty-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+/* Shell: the two board tabs sit above one board and never scroll with it. */
+.dsh-todo-shell{height:100%;display:flex;flex-direction:column;min-height:0;
+  background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);
+  font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.dsh-todo-shell *{box-sizing:border-box}
+.dsh-todo-tabs{flex:0 0 auto;display:flex;align-items:stretch;gap:2px;padding:6px 8px 0;
+  box-shadow:inset 0 -1px 0 var(--dsw-alias-border-l1)}
+.dsh-todo-tab{position:relative;font:inherit;font-size:12px;line-height:24px;padding:2px 10px 6px;
+  border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;
+  border-radius:6px 6px 0 0}
+.dsh-todo-tab:hover{color:var(--dsw-alias-label-primary)}
+.dsh-todo-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}
+.dsh-todo-tab[aria-selected="true"]{color:var(--dsw-alias-label-primary);font-weight:600}
+.dsh-todo-tab[aria-selected="true"]::after{content:'';position:absolute;left:8px;right:8px;bottom:-1px;
+  height:2px;border-radius:2px;background:var(--dsw-alias-brand-primary)}
+/* No board on this tab: the label stays visible but stops claiming emphasis. */
+.dsh-todo-tab[data-empty="true"]{opacity:.62}
+.dsh-todo-tab[data-empty="true"][aria-selected="true"]{opacity:1}
+.dsh-todo-page{flex:1 1 auto;min-height:0;overflow:hidden}
 .dsh-todo-stage-focus{padding:5px 10px 6px;border-bottom:1px solid var(--dsw-alias-border-l2);
   background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 12%,transparent)}
 .dsh-todo-movebar{position:sticky;bottom:0;z-index:3;display:flex;align-items:center;gap:8px;
@@ -757,6 +809,38 @@ ${SWITCH_STYLE}
       }
     }
 
+    /** Where the panel remembers which board tab a Session was on. */
+    const BOARD_TAB_KEY = 'dsh-todo:board:'
+
+    /**
+     * The board tab this Session was last on.
+     * @param sessionId - the Session id.
+     * @returns `public` / `private`, or undefined when nothing was remembered.
+     */
+    function getBoardTab(sessionId) {
+      if (typeof sessionId !== 'string' || sessionId === '') return undefined
+      try {
+        const value = window.localStorage.getItem(BOARD_TAB_KEY + sessionId)
+        return value === 'public' || value === 'private' ? value : undefined
+      } catch {
+        return undefined
+      }
+    }
+
+    /**
+     * Remember the board tab for one Session.
+     * @param sessionId - the Session id.
+     * @param board - `public` or `private`.
+     */
+    function setBoardTab(sessionId, board) {
+      if (typeof sessionId !== 'string' || sessionId === '') return
+      try {
+        window.localStorage.setItem(BOARD_TAB_KEY + sessionId, board)
+      } catch {
+        // Storage unavailable: the tab is remembered for this page load only.
+      }
+    }
+
     /** Where the per-Session switch is remembered (default: off). */
     const SESSION_KEY = 'dsh-todo:session:'
 
@@ -848,7 +932,7 @@ ${SWITCH_STYLE}
           openRequest: Number.isInteger(parsed.ui?.openRequest) ? parsed.ui.openRequest : 0,
           notify: ['next-turn', 'wake', 'off'].includes(parsed.ui?.notify) ? parsed.ui.notify : 'next-turn',
           notifyWindow: Number.isInteger(parsed.ui?.notifyWindow) ? parsed.ui.notifyWindow : 8,
-          style: ['paper', 'calm', 'vivid', 'md3'].includes(parsed.ui?.style) ? parsed.ui.style : 'vivid',
+          style: ['md3', 'vivid', 'paper', 'calm'].includes(parsed.ui?.style) ? parsed.ui.style : 'md3',
           material: typeof parsed.ui?.material === 'boolean' ? parsed.ui.material : true,
           next: typeof parsed.ui?.next === 'string' ? parsed.ui.next : null,
           groups, items,
@@ -894,6 +978,61 @@ ${SWITCH_STYLE}
           if (pending !== undefined && typeof pending.catch === 'function') pending.catch(() => {})
         } catch {
           // The Host will keep its previous value; the panel still works locally.
+        }
+      }
+
+      /**
+       * Run one `/todo op` payload through the Host command channel.
+       * @param sessionId - the Session the panel belongs to.
+       * @param payload - the whole command payload.
+       * @returns the command outcome promise.
+       */
+      function runTodo(sessionId, payload) {
+        return ctx.remote.commands.execute(sessionId, '/todo op ' + JSON.stringify(payload), [])
+      }
+
+      /**
+       * Read a command outcome as failure text, or undefined when it succeeded.
+       *
+       * `commands.execute` resolves to `{ ok, value: CommandExecution }`, and the
+       * handler's own answer is one level deeper (`value.result`). Reading
+       * `value.kind` — as an earlier version did — silently treated every failure
+       * as success and handed `undefined` to the caller.
+       * @param outcome - the `commands.execute` result.
+       * @returns the message, or undefined.
+       */
+      function failureOf(outcome) {
+        if (outcome?.ok === false) return outcome.error?.message ?? '命令调用失败'
+        const execution = outcome?.value
+        if (execution === undefined) return '命令没有执行（未知命令？）'
+        const result = execution.result ?? execution
+        return result?.kind === 'error' ? (result.text ?? '命令失败') : undefined
+      }
+
+      /**
+       * The handler's success text, if it left one.
+       * @param outcome - the `commands.execute` result.
+       * @returns the text, or undefined.
+       */
+      function resultText(outcome) {
+        const execution = outcome?.value
+        const result = execution?.result ?? execution
+        return typeof result?.text === 'string' ? result.text : undefined
+      }
+
+      /**
+       * Tell the Host which tab the user is on. The tool uses it as the default
+       * board, so "add this to the plan" means the board on screen.
+       * @param sessionId - the Session id.
+       * @param board - `public` or `private`.
+       */
+      function pushActiveBoard(sessionId, board) {
+        if (typeof sessionId !== 'string' || sessionId === '') return
+        try {
+          const pending = runTodo(sessionId, { op: { op: 'active', board } })
+          if (pending !== undefined && typeof pending.catch === 'function') pending.catch(() => {})
+        } catch {
+          // The Host falls back to "the only board that exists".
         }
       }
 
@@ -1411,8 +1550,8 @@ ${SWITCH_STYLE}
       /** The centred empty / error screen. */
       /** Panel looks offered by the settings page, in display order. */
       const STYLE_MODES = [
-        { style: 'vivid', key: 'vivid' },
         { style: 'md3', key: 'md3' },
+        { style: 'vivid', key: 'vivid' },
         { style: 'paper', key: 'paper' },
         { style: 'calm', key: 'calm' },
       ]
@@ -1453,7 +1592,7 @@ ${SWITCH_STYLE}
         }
         return h('div', {
           className: 'dsh-todo',
-          'data-style': plan.style ?? 'vivid',
+          'data-style': plan.style ?? 'md3',
           'data-material': (plan.material ?? true) ? 'on' : 'off',
         },
           h('style', {}, STYLE),
@@ -1473,12 +1612,12 @@ ${SWITCH_STYLE}
                 type: 'button',
                 className: 'dsh-todo-choice',
                 'data-action': 'style-' + entry.style,
-                'aria-pressed': (plan.style ?? 'vivid') === entry.style,
+                'aria-pressed': (plan.style ?? 'md3') === entry.style,
                 onClick: () => { props.handlers.setStyle(entry.style) },
               },
                 h('span', { className: 'dsh-todo-choice-head' },
                   h('span', { className: 'dsh-todo-choice-title' }, t('panel.style.' + entry.key)),
-                  h('span', { className: 'dsh-todo-choice-mark' }, (plan.style ?? 'vivid') === entry.style ? '●' : ''),
+                  h('span', { className: 'dsh-todo-choice-mark' }, (plan.style ?? 'md3') === entry.style ? '●' : ''),
                 ),
                 desc === '' ? null : h('span', { className: 'dsh-todo-choice-desc' }, desc),
               )
@@ -1576,6 +1715,56 @@ ${SWITCH_STYLE}
           h('path', { d: 'M12 22l1.8 1.8 3.2-3.4', ...stroke }),
           h('path', { d: 'M20.5 22.3h8', ...stroke }),
           h('path', { d: 'M20.5 29.5h5.5', ...stroke }),
+        )
+      }
+
+      /**
+       * The two board tabs. Both are always here: an empty one says so when
+       * opened rather than disappearing, so the way to start a board is never
+       * hidden behind a menu.
+       */
+      function BoardTabs(props) {
+        const tabs = [
+          { board: 'public', label: t('tab.public'), hint: t('tab.public.hint') },
+          { board: 'private', label: t('tab.private'), hint: t('tab.private.hint') },
+        ]
+        return h('nav', { className: 'dsh-todo-tabs', role: 'tablist' },
+          tabs.map(tab => {
+            const known = props.boards?.[tab.board]
+            return h('button', {
+              key: tab.board,
+              type: 'button',
+              role: 'tab',
+              className: 'dsh-todo-tab',
+              'data-action': 'board-tab-' + tab.board,
+              'data-empty': known !== undefined && known.exists !== true ? 'true' : 'false',
+              'aria-selected': props.active === tab.board,
+              title: tab.hint,
+              onClick: () => { props.onPick(tab.board) },
+            }, tab.label)
+          }),
+        )
+      }
+
+      /** Neither board exists: one card that offers both starts. */
+      function BothEmpty(props) {
+        const button = (board, label) => h('button', {
+          key: board,
+          type: 'button',
+          className: 'dsh-todo-action-button',
+          'data-action': 'create-' + board,
+          disabled: props.busy !== undefined,
+          onClick: () => { props.onCreate(board) },
+        }, props.busy === board ? t('empty.creating') : label)
+        return h('div', { className: 'dsh-todo-empty' },
+          h('div', { className: 'dsh-todo-empty-icon' }, h(EmptyGlyph, {})),
+          h('div', { className: 'dsh-todo-empty-title' }, t('empty.both.title')),
+          h('div', { className: 'dsh-todo-empty-body' }, t('empty.both.body')),
+          h('div', { className: 'dsh-todo-empty-actions' },
+            button('public', t('empty.createPublic')),
+            button('private', t('empty.createPrivate')),
+          ),
+          props.error === undefined ? null : h(ErrorBar, { message: props.error }),
         )
       }
 
@@ -1711,12 +1900,19 @@ ${SWITCH_STYLE}
         }
         if (state.kind === 'noSession') return h(StatusScreen, { title: t('panel.title'), body: t('noWorkspace') })
         if (state.kind === 'missing') {
+          const board = view.board === 'private' ? 'private' : 'public'
+          const otherTab = t(board === 'public' ? 'tab.private' : 'tab.public')
+          const body = (board === 'private' ? t('empty.private.body') : t('empty.public.body'))
+            + (view.otherExists === true ? ' ' + fill(t('empty.otherTab'), { tab: otherTab }) : '')
           return h(StatusScreen, {
-            title: t('empty.title'),
-            body: t('empty.body'),
+            title: board === 'private' ? t('empty.private.title') : t('empty.public.title'),
+            body,
             action: view.busy === true
-              ? { label: t('panel.creating'), disabled: true, onClick: () => {} }
-              : { label: t('panel.create'), onClick: () => { handlers.create() } },
+              ? { label: t('empty.creating'), disabled: true, onClick: () => {} }
+              : {
+                label: board === 'private' ? t('empty.createPrivate') : t('empty.createPublic'),
+                onClick: () => { handlers.create() },
+              },
             error: view.error,
           })
         }
@@ -1769,7 +1965,7 @@ ${SWITCH_STYLE}
         return h('div', {
           className: 'dsh-todo',
           ref: rootRef,
-          'data-style': plan.style ?? 'vivid',
+          'data-style': plan.style ?? 'md3',
           'data-material': (plan.material ?? true) ? 'on' : 'off',
         },
           h('style', {}, STYLE),
@@ -1813,8 +2009,12 @@ ${SWITCH_STYLE}
             index: section.index,
           })),
           h(AddStage, { view, handlers }),
-          h('div', { className: 'dsh-todo-foot dsh-todo-mono' },
-            t('panel.file') + ' ' + (state.path ?? PLAN_FILE) + ' · rev ' + plan.rev),
+          h('div', {
+            className: 'dsh-todo-foot dsh-todo-mono',
+            title: state.absolutePath ?? state.path ?? '',
+          }, (view.board === 'private'
+            ? t('panel.privateBoard')
+            : t('panel.file') + ' ' + (state.path ?? PLAN_FILE)) + ' · rev ' + plan.rev),
           view.pendingMove === undefined
             ? null
             : h(MoveBar, { plan, move: view.pendingMove, handlers }),
@@ -1822,13 +2022,21 @@ ${SWITCH_STYLE}
       }
 
       /**
-       * The tab body: load and follow the plan file, own the inline-edit state,
-       * and send every write through the Host command.
-       * @param props - slot runtime props; `sessionId` names the workspace.
-       * @returns the panel.
+       * One board: load and follow its file, own the inline-edit state, and send
+       * every write through the Host command.
+       *
+       * The workspace board is a file inside the workspace, so it is read through
+       * the workspace-file Remote and searched for when it is not at the root. The
+       * private board lives under the Harness home — outside the workspace — and
+       * the same Remote still reads and watches a file there by absolute path;
+       * only listings and searches are workspace-scoped.
+       * @param props - `sessionId`, `board`, `privatePath`, `otherExists`, `onCreated`.
+       * @returns the board panel.
        */
-      function TodoBody(props) {
+      function BoardBody(props) {
         const sessionId = props.sessionId
+        const board = props.board === 'private' ? 'private' : 'public'
+        const privatePath = props.privatePath
         const [state, setState] = React.useState({ kind: 'loading' })
         const [hideCompleted, setHideCompleted] = React.useState(undefined)
         const [editing, setEditing] = React.useState(undefined)
@@ -1888,6 +2096,8 @@ ${SWITCH_STYLE}
         const [drag, setDrag] = React.useState(undefined)
         const [dropTarget, setDropTarget] = React.useState(undefined)
         const [pendingMove, setPendingMove] = React.useState(undefined)
+        /** Re-read this board right away (a write landed; the watch may be slow). */
+        const reloadRef = React.useRef(undefined)
 
         React.useEffect(() => {
           if (pendingMove === undefined) return undefined
@@ -1903,11 +2113,12 @@ ${SWITCH_STYLE}
           let alive = true
           const controller = new AbortController()
           let timer
+          let poll
           let currentPath
 
           const readAt = path => ctx.remote.workspaceFiles.read(sessionId, path, {}, controller.signal)
 
-          /** Find the plan file: the remembered path, then the root, then anywhere in the workspace. */
+          /** Find the workspace board: the remembered path, then the root, then anywhere. */
           const locate = async () => {
             const remembered = currentPath
             if (remembered !== undefined) {
@@ -1930,10 +2141,17 @@ ${SWITCH_STYLE}
             return { path: located, result: await readAt(located) }
           }
 
+          /** Read the board this body is about: a root file, or one fixed path. */
+          const locateBoard = async () => {
+            if (board === 'public') return locate()
+            if (typeof privatePath !== 'string' || privatePath === '') return { path: undefined, result: { ok: false, error: { code: 'workspace-file/not-found' } } }
+            return { path: privatePath, result: await readAt(privatePath) }
+          }
+
           const load = async () => {
             let located
             try {
-              located = await locate()
+              located = await locateBoard()
             } catch (failure) {
               if (alive) setState({ kind: 'error', message: String(failure?.message ?? failure) })
               return
@@ -1961,19 +2179,25 @@ ${SWITCH_STYLE}
             }
             currentPath = located.path
             setFoldedChildren(readFolded(located.path))
-            setState({
-              kind: 'ready',
-              plan: normalized.plan,
-              path: located.path,
-              absolutePath: result.value.absolutePath,
-              problems: planProblems(parsed),
+            setState(current => {
+              // A poll must not restart the panel: same rev means same board.
+              if (current.kind === 'ready' && current.plan.rev === normalized.plan.rev
+                && current.path === located.path) return current
+              return {
+                kind: 'ready',
+                plan: normalized.plan,
+                path: located.path,
+                absolutePath: result.value.absolutePath,
+                problems: planProblems(parsed),
+              }
             })
             watch(located.path)
           }
+          reloadRef.current = () => { void load() }
 
           const streams = new Map()
           const watch = path => {
-            if (streams.has(path)) return
+            if (typeof path !== 'string' || streams.has(path)) return
             let stream
             try {
               stream = ctx.remote.$stream({
@@ -1999,20 +2223,22 @@ ${SWITCH_STYLE}
             timer = setTimeout(() => { void load() }, REFRESH_DELAY_MS)
           }
 
-          watch(PLAN_FILE)
+          watch(board === 'public' ? PLAN_FILE : privatePath)
           void load()
+          // The watch on a file outside the workspace can silently stay closed;
+          // a slow re-read keeps the private board honest without writing
+          // anything into the Session log (a read is not a command).
+          if (board === 'private' && typeof privatePath === 'string' && privatePath !== '') {
+            poll = setInterval(() => { if (alive) void load() }, PRIVATE_POLL_MS)
+          }
 
           return () => {
             alive = false
             clearTimeout(timer)
+            clearInterval(poll)
             controller.abort()
           }
-        }, [sessionId])
-
-        /** Read the command outcome as either text or undefined. */
-        const failureOf = outcome => outcome?.ok === false
-          ? (outcome.error?.message ?? '命令调用失败')
-          : (outcome?.value?.kind === 'error' ? outcome.value.text : undefined)
+        }, [sessionId, board, privatePath])
 
         const queueRef = React.useRef(Promise.resolve())
         const pendingCountRef = React.useRef(0)
@@ -2034,35 +2260,43 @@ ${SWITCH_STYLE}
 
         /**
          * Send one operation through the Host command. The panel never edits
-         * its own copy: the write lands, and the file watch re-reads it.
+         * its own copy: the write lands, and the file is re-read.
          * @param op - the operation to apply.
          */
         const send = (op) => {
-          if (pathRef.current === undefined) { setError('还没有读到计划文件'); return Promise.resolve() }
+          if (board === 'public' && pathRef.current === undefined) { setError('还没有读到计划文件'); return Promise.resolve() }
           return enqueueWrite(async () => {
             const path = pathRef.current
-            if (path === undefined) { setError('还没有读到计划文件'); return }
             try {
-              const run = payload => ctx.remote.commands.execute(sessionId, '/todo op ' + JSON.stringify(payload), [])
-              let failure = failureOf(await run({ path, op }))
-              if (failure !== undefined && failure.includes('不认识的操作')) {
+              let failure = failureOf(await runTodo(sessionId, board === 'private'
+                ? { board: 'private', op }
+                : { path, op }))
+              if (board === 'public' && failure !== undefined && failure.includes('不认识的操作')) {
                 // Bridge for a host that predates the nested `{ path, op }` form:
                 // resend with the operation fields beside `path`.
-                failure = failureOf(await run({ path, ...op }))
+                failure = failureOf(await runTodo(sessionId, { path, ...op }))
               }
-              if (failure !== undefined) setError(failure)
+              if (failure !== undefined) { setError(failure); return }
+              // The workspace board has a live watch; the private one may not, so
+              // read it back instead of waiting for the poll.
+              if (board === 'private') reloadRef.current?.()
             } catch (failure) {
               setError(String(failure?.message ?? failure))
             }
           })
         }
 
-        /** Create a plan file at the workspace root; the watch then loads it. */
+        /** Create the board this body shows; the shell is told a board appeared. */
         const sendCreate = () => enqueueWrite(async () => {
           try {
-            const line = '/todo op ' + JSON.stringify({ op: { op: 'create' } })
-            const failure = failureOf(await ctx.remote.commands.execute(sessionId, line, []))
-            if (failure !== undefined) setError(failure)
+            const failure = failureOf(await runTodo(sessionId, board === 'private'
+              ? { board: 'private', op: { op: 'create' } }
+              : { op: { op: 'create' } }))
+            if (failure !== undefined) { setError(failure); return }
+            props.onCreated?.()
+            // Read it back instead of waiting for a watch on a file that did not
+            // exist when the subscription was opened.
+            reloadRef.current?.()
           } catch (failure) {
             setError(String(failure?.message ?? failure))
           }
@@ -2257,10 +2491,131 @@ ${SWITCH_STYLE}
           view: {
             editing, adding, confirming, dating, collapsed, foldedChildren, enabled, page, busy, error, hideCompleted,
             drag, dropTarget, pendingMove, flashIds, removing,
+            board,
+            otherExists: props.otherExists === true,
           },
           handlers,
           now: new Date(),
         })
+      }
+
+      /**
+       * The sidebar tab: two board tabs over one board.
+       *
+       * Both tabs are always shown. Creating a board is an explicit act — the
+       * switch never creates one — so an empty tab offers the create button
+       * instead of disappearing, and when neither board exists the panel says so
+       * once, with both choices.
+       * @param props - slot runtime props; `sessionId` names the Session.
+       * @returns the panel shell.
+       */
+      function TodoBody(props) {
+        const sessionId = props.sessionId
+        const [active, setActive] = React.useState(() => getBoardTab(sessionId) ?? 'public')
+        const [boards, setBoards] = React.useState(undefined)
+        const [error, setError] = React.useState(undefined)
+        const [creating, setCreating] = React.useState(undefined)
+
+        /** Ask the Host where both boards are and whether they exist. */
+        const refresh = React.useCallback(async () => {
+          if (typeof sessionId !== 'string' || sessionId === '') return
+          try {
+            const outcome = await runTodo(sessionId, { op: { op: 'boards' } })
+            const failure = failureOf(outcome)
+            if (failure !== undefined) {
+              // An older Host does not know `boards`; the two halves are shipped
+              // together, so the fix is a restart, not a retry.
+              setError(failure.includes('缺少 path') || failure.includes('不认识的操作')
+                ? '面板已经是新版，宿主还是旧版：重启 DSH 后刷新页面即可'
+                : failure)
+              return
+            }
+            const text = resultText(outcome)
+            if (text === undefined) { setError('宿主没有返回板的位置'); return }
+            setError(undefined)
+            setBoards(JSON.parse(text))
+          } catch (failure) {
+            setError(String(failure?.message ?? failure))
+          }
+        }, [sessionId])
+
+        React.useEffect(() => {
+          setActive(getBoardTab(sessionId) ?? 'public')
+          setBoards(undefined)
+          void refresh()
+        }, [sessionId, refresh])
+
+        /** The Host defaults the tool to this tab, so keep it told. */
+        const announce = React.useCallback((board) => {
+          if (typeof sessionId !== 'string' || sessionId === '') return
+          if (getSessionSwitch(sessionId)) pushActiveBoard(sessionId, board)
+        }, [sessionId])
+
+        React.useEffect(() => { announce(active) }, [active, announce])
+
+        // Coming back to the window is the natural moment to re-ask: the agent may
+        // have created a board while this panel was showing the empty card.
+        React.useEffect(() => {
+          if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined
+          const onFocus = () => { void refresh() }
+          window.addEventListener('focus', onFocus)
+          return () => { window.removeEventListener('focus', onFocus) }
+        }, [refresh])
+
+        const pick = board => {
+          if (board === active) return
+          setActive(board)
+          setBoardTab(sessionId, board)
+          // A board the agent created while this panel was open is only in the
+          // Host's answer, so ask again on every tab switch.
+          void refresh()
+        }
+
+        const createBoard = async (board) => {
+          if (typeof sessionId !== 'string' || sessionId === '') return
+          setCreating(board)
+          setError(undefined)
+          try {
+            const failure = failureOf(await runTodo(sessionId, { board, op: { op: 'create' } }))
+            if (failure !== undefined) { setError(failure); return }
+            setActive(board)
+            setBoardTab(sessionId, board)
+            await refresh()
+          } catch (failure) {
+            setError(String(failure?.message ?? failure))
+          } finally {
+            setCreating(undefined)
+          }
+        }
+
+        const bothMissing = boards !== undefined && boards.error === undefined
+          && boards.public !== undefined && boards.private !== undefined
+          && boards.public.exists !== true && boards.private.exists !== true
+        const other = active === 'public' ? 'private' : 'public'
+        const otherExists = boards !== undefined && boards[other]?.exists === true
+
+        return h('div', { className: 'dsh-todo-shell' },
+          h('style', {}, STYLE),
+          h(BoardTabs, { boards, active, onPick: pick }),
+          h('div', { className: 'dsh-todo-page' },
+            boards === undefined
+              ? h(StatusScreen, {
+                title: t('panel.title'),
+                body: error ?? t('panel.loading'),
+              })
+              : bothMissing
+                ? h(BothEmpty, { busy: creating, error, onCreate: createBoard })
+                : h(BoardBody, {
+                  key: active,
+                  sessionId,
+                  board: active,
+                  privatePath: boards?.private?.path ?? undefined,
+                  otherExists,
+                  onCreated: refresh,
+                }),
+            error === undefined || bothMissing || boards === undefined ? null : h(ErrorBar, { message: error }),
+          ),
+        )
       }
 
       /** Find one item or child by id in the loaded plan. */
@@ -2297,7 +2652,9 @@ ${SWITCH_STYLE}
           knownPath.current = undefined
           if (sessionId === undefined) return undefined
           let alive = true
-          let seen
+          /** Last `ui.openRequest` seen per board file; a bump means "open the panel". */
+          const seen = new Map()
+          let privatePath
           let timer
           const controller = new AbortController()
           const streams = new Map()
@@ -2347,35 +2704,60 @@ ${SWITCH_STYLE}
             if (located === undefined) return { path: PLAN_FILE, result: root }
             return { path: located, result: await read(located) }
           }
-          const check = async () => {
-            const located = await locate()
-            if (!alive || !located.result.ok) return
-            knownPath.current = located.path
-            watch(located.path)
+          /** Compare one board's request counter; the first sighting only records it. */
+          const notice = (path, text) => {
             let parsed
             try {
-              parsed = JSON.parse(located.result.value.text)
+              parsed = JSON.parse(text)
             } catch {
               return
             }
             const request = Number.isInteger(parsed?.ui?.openRequest) ? parsed.ui.openRequest : 0
-            if (seen === undefined) {
-              seen = request
-              return
-            }
-            if (request > seen) {
-              seen = request
+            const before = seen.get(path)
+            if (before === undefined) { seen.set(path, request); return }
+            if (request > before) {
+              seen.set(path, request)
               ctx.sidebarRight.openTab(KIND)
+            }
+          }
+          const check = async () => {
+            const located = await locate()
+            if (alive && located.result.ok) {
+              knownPath.current = located.path
+              watch(located.path)
+              notice(located.path, located.result.value.text)
+            }
+            // The private board has its own request counter: "open the panel" must
+            // work whichever board the user is on. Its path comes from the Host,
+            // and only a switched-on Session asks for it.
+            if (typeof privatePath !== 'string' || !alive) return
+            watch(privatePath)
+            const hit = await read(privatePath)
+            if (alive && hit.ok) notice(privatePath, hit.value.text)
+          }
+          const findPrivate = async () => {
+            if (!getSessionSwitch(sessionId)) return
+            try {
+              const outcome = await runTodo(sessionId, { op: { op: 'boards' } })
+              if (failureOf(outcome) !== undefined) return
+              const text = resultText(outcome)
+              if (text === undefined) return
+              const parsed = JSON.parse(text)
+              privatePath = parsed?.private?.path ?? undefined
+              if (alive) void check()
+            } catch {
+              // No Host answer: the workspace board is still watched.
             }
           }
           watch(PLAN_FILE)
           void check()
+          void findPrivate()
           return () => {
             alive = false
             clearTimeout(timer)
             controller.abort()
           }
-        }, [sessionId])
+        }, [sessionId, on])
 
         return h('span', { className: 'dsh-todo-composer' },
           h('style', {}, CHIP_STYLE),
@@ -2409,7 +2791,7 @@ ${SWITCH_STYLE}
         )
       }
 
-      return { TodoBody, PlanPanel, OpenChip, HiddenCommandRow }
+      return { TodoBody, PlanPanel, OpenChip, HiddenCommandRow, BoardTabs, BothEmpty, failureOf, resultText }
     }
 
     const plugin = {
@@ -2456,7 +2838,7 @@ ${SWITCH_STYLE}
     }
 
     // The smoke check renders the panel without React; the page never sets this flag.
-    if (globalThis.__DSH_TODO_TEST__) plugin.__test = { buildUi, normalizePlan, pickPlanPath, planProblems }
+    if (globalThis.__DSH_TODO_TEST__) plugin.__test = { buildUi, normalizePlan, pickPlanPath, planProblems, STYLE }
     return plugin
   },
 })

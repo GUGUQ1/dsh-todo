@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs'
 import { readFile, readdir, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { fileExists, isBoardSessionId, privateBoardFile, privateBoardDir } from './host/boards.js'
 import { applyOpAndWrite, createPlanFile, PLAN_FILE, readPlanFile } from './host/plan.js'
 
 /** Required Host services. */
@@ -19,6 +20,19 @@ export const inject = ['commands']
 
 /** Pending notifications, one bucket per agent session. */
 const pending = new Map()
+
+/**
+ * Which board the panel is showing in one Session, pushed by the browser when
+ * the user switches tabs. It is the tool's default target: "add this to the
+ * plan" means the board the user is looking at.
+ */
+const activeBoards = new Map()
+
+/** Human name of a board, for messages that have to say which one was meant. */
+function boardLabel(board) {
+  return board === 'private' ? '本会话私板' : '工作区公板'
+}
+
 
 /**
  * Whether the plugin is switched on for one Session.
@@ -103,10 +117,12 @@ export function setSessionEnabled(sessionId, enabled) {
 /** What the model is told when this Session has the panel switched on. */
 const SESSION_PROMPT = [
   '## 项目计划面板（本会话已启用）',
-  '工作区里的 todolist.json 由右栏「项目计划」面板展示；用 todolist 工具读写它，不要用 write/edit 直接改这个文件。',
+  '右栏「项目计划」面板能显示两块板：**工作区公板**（工作区根目录的 todolist.json）和**本会话私板**（跟着这个对话走，存在 DSH 数据目录里）。',
+  '用 todolist 工具读写它们，不要用 write/edit 直接改文件；工具默认作用在用户正看着的那块板（面板当前页签），两块板都存在且用户没说哪块时才需要问一句。',
   '分工：用户只勾「完成 / 未完成」；「进行中」（可多项）与「下一步」（单指针）由你维护。',
   '时机：用户明确要求时直接改；一轮工作有实质进展（开始做、做完、发现新任务）时顺手更新；与计划无关的闲聊不要动。',
   '写之前先 read 拿 id；一次只改一件事；标题只写「做什么」，不写状态。',
+  '别的会话的私板只能读（board 传 session:<会话 id>），不能改，也不能替用户建。',
   '详细约定见技能 dsh-todo-plan。',
 ].join('\n')
 
@@ -139,8 +155,9 @@ function noticeMessage(text) {
  * @param agent - the Session's agent.
  * @param note - what changed, one short clause, or null for nothing worth telling.
  * @param ui - the plan's ui block (notify mode and window).
+ * @param board - which board changed; shown so the agent does not edit the other one.
  */
-function notifyAgent(agent, note, ui) {
+function notifyAgent(agent, note, ui, board = 'public') {
   const session = agent?.session
   // Key by the Session id when it has one: the switch is stored per id, and a
   // queued notice must be cancellable from setSessionEnabled(sessionId).
@@ -162,7 +179,7 @@ function notifyAgent(agent, note, ui) {
   bucket.timer = setTimeout(() => {
     pending.delete(key)
     if (!sessionEnabled(agent) || bucket.notify === 'off') return
-    const text = `（面板）用户在计划面板里${bucket.notes.join('；')}。需要时用 todolist read 看最新计划；不要因为这条通知开始新工作。`
+    const text = `（面板）用户在${boardLabel(board)}上${bucket.notes.join('；')}。需要时用 todolist read 看最新计划；不要因为这条通知开始新工作。`
     try {
       const message = noticeMessage(text)
       // Belt and braces: a string here corrupts the Session on its next load,
@@ -285,6 +302,55 @@ async function resolvePlanFile(cwd) {
 }
 
 /**
+ * Resolve both boards of one Session: where each one would live and whether it
+ * exists. A board that exists but is broken still counts as existing, so the
+ * panel can offer to repair it instead of pretending it is not there.
+ * @param ctx - Host context.
+ * @param exec - tool or command run context (`agent` is the Session).
+ * @returns `{ cwd, sessionId, public: {path, exists}, private: {path, exists} }`.
+ */
+async function resolveBoards(ctx, exec) {
+  const cwd = await planCwd(ctx, exec)
+  const sessionId = sessionIdOf(exec.agent)
+  const publicPath = typeof cwd === 'string' && cwd !== '' ? await resolvePlanFile(cwd) : undefined
+  const privatePath = sessionId === undefined ? undefined : privateBoardFile(sessionId)
+  return {
+    cwd,
+    sessionId,
+    public: { path: publicPath, exists: await fileExists(publicPath) },
+    private: { path: privatePath, exists: await fileExists(privatePath) },
+  }
+}
+
+/**
+ * Pick the board an operation is about.
+ *
+ * Order: what the caller named, then the tab the user is looking at, then the
+ * only board that exists. With two boards and no hint the call is refused on
+ * purpose — writing into the wrong board is worse than one extra question.
+ * @param ctx - Host context.
+ * @param exec - tool or command run context.
+ * @param requested - `public` / `private` when the caller was explicit.
+ * @returns `{ board, path, exists, boards }`.
+ */
+async function pickBoard(ctx, exec, requested) {
+  const boards = await resolveBoards(ctx, exec)
+  const active = activeBoards.get(boards.sessionId)
+  const explicit = requested ?? active
+  if (explicit === 'public' || explicit === 'private') {
+    return { board: explicit, ...boards[explicit], boards }
+  }
+  const existing = ['public', 'private'].filter(name => boards[name].exists)
+  if (existing.length === 1) return { board: existing[0], ...boards[existing[0]], boards }
+  if (existing.length === 0) {
+    // Nothing exists yet: a plain "create the plan" means the workspace board.
+    return { board: 'public', ...boards.public, boards }
+  }
+  throw new Error('这个工作区和这个会话各有一块板（工作区公板 / 本会话私板）。'
+    + '请用 board 参数说明改哪一块；用户没指定就问一句')
+}
+
+/**
  * Compact text of a plan for the model: stages, statuses, due dates, ids, and
  * which item is next. Markdown, not JSON — the file itself is one tool call away.
  * @param plan - validated plan.
@@ -352,24 +418,38 @@ function toolsService(ctx) {
 const STATUS_FILE = join(tmpdir(), 'dsh-todo-tool-status.json')
 
 /**
+ * Serializes the read-modify-write on {@link STATUS_FILE}.
+ *
+ * The tool registration runs asynchronously while the prompt and the skill
+ * register synchronously, so three writers land at once and two of them used to
+ * read the same old file and overwrite each other's key. The queue costs nothing
+ * and keeps every outcome visible.
+ */
+let statusWrites = Promise.resolve()
+
+/**
  * Record one registration outcome under its own key.
- * @param key - `tool` or `skill`.
+ * @param key - `tool`, `skill`, or `prompt`.
  * @param value - status fields.
  * @returns when the note is written (failures are ignored).
  */
-async function recordStatus(key, value) {
-  let previous = {}
-  try {
-    previous = JSON.parse(await readFile(STATUS_FILE, 'utf8'))
-  } catch {
-    // No file yet, or somebody left half a line: start over.
-  }
-  const next = { ...previous, [key]: { ...value, at: new Date().toISOString() } }
-  try {
-    await writeFile(STATUS_FILE, `${JSON.stringify(next)}\n`, 'utf8')
-  } catch {
-    // Diagnostics are best-effort.
-  }
+function recordStatus(key, value) {
+  const write = statusWrites.then(async () => {
+    let previous = {}
+    try {
+      previous = JSON.parse(await readFile(STATUS_FILE, 'utf8'))
+    } catch {
+      // No file yet, or somebody left half a line: start over.
+    }
+    const next = { ...previous, [key]: { ...value, at: new Date().toISOString() } }
+    try {
+      await writeFile(STATUS_FILE, `${JSON.stringify(next)}\n`, 'utf8')
+    } catch {
+      // Diagnostics are best-effort.
+    }
+  }).catch(() => {})
+  statusWrites = write
+  return write
 }
 
 /**
@@ -634,26 +714,15 @@ async function planCwd(ctx, exec) {
 
 export async function registerTool(ctx, options = {}) {
   const build = options.buildTool ?? buildToolDefinition
-  const withPlan = async (exec) => {
-    const cwd = await planCwd(ctx, exec)
-    if (cwd === undefined) {
-      // Say what was missing: this failure only shows up in a live session.
-      const service = workingDirectoryService(ctx) === undefined ? '无' : '有'
-      const keys = Object.keys(exec?.agent?.session ?? {}).join(',') || '无'
-      throw new Error(`拿不到会话工作区，读不到计划（workingDirectory 服务：${service}；session 字段：${keys}）`)
-    }
-    const file = await resolvePlanFile(cwd)
-    const read = await readPlanFile(file)
-    if (!read.ok) throw new Error(read.error === 'missing' ? '这个工作区还没有 todolist.json，先用 create' : read.error)
-    return { file, plan: read.plan }
-  }
   let tool
   try {
     tool = build({
       name: 'todolist',
-      description: 'Read or change the workspace plan file (todolist.json) that the Plan panel shows. '
+      description: 'Read or change a plan board that the right-sidebar Plan panel shows. '
+        + 'There can be two: the public board (a workspace file, todolist.json) and the private board (this conversation\'s own). '
+        + 'Pass board to say which one; omit it to use the board the user is looking at, or the only one that exists. '
         + 'Actions: read, add, addChild, addGroup, status, rename, due, note, remove, move, reorder, reorderGroups, settings, next, open, create. '
-        + 'Use it whenever the user asks about or changes the plan; ids come from read.',
+        + 'Use it whenever the user asks about or changes a board; ids come from read.',
       parameters: {
         action: {
           type: 'string',
@@ -663,6 +732,12 @@ export async function registerTool(ctx, options = {}) {
             'remove', 'move', 'reorder', 'reorderGroups', 'settings', 'next', 'open', 'create',
           ],
           description: 'What to do.',
+        },
+        board: {
+          type: 'string',
+          description: 'Which board: "public" (the workspace board) or "private" (this conversation\'s board). '
+            + 'Omit to use the board the user is looking at, or the only one that exists. '
+            + '"session:<id>" reads another conversation\'s private board, read-only.',
         },
         id: { type: 'string', description: 'Item, child, or stage id (or "" / null to clear next).' },
         title: { type: 'string', description: 'Title for add, addChild, addGroup, rename, or create.' },
@@ -678,7 +753,7 @@ export async function registerTool(ctx, options = {}) {
         hideCompleted: { type: 'boolean', description: 'Panel display setting.' },
         notify: { type: 'string', enum: ['next-turn', 'wake', 'off'], description: 'How panel edits reach you.' },
         notifyWindow: { type: 'integer', description: 'Seconds over which panel edits merge into one notice (1..600).' },
-        style: { type: 'string', enum: ['vivid', 'md3', 'paper', 'calm'], description: 'Panel look: vivid (default), md3 (Material Design), paper, or calm.' },
+        style: { type: 'string', enum: ['md3', 'vivid', 'paper', 'calm'], description: 'Panel look: md3 (default, Material Design 3), vivid, paper, or calm.' },
         material: { type: 'boolean', description: 'Advanced materials (gradients, shadows, glass). Off is flatter and cheaper.' },
       },
       output: {
@@ -691,7 +766,7 @@ export async function registerTool(ctx, options = {}) {
       },
       async execute(args, exec) {
         // The per-Session switch is the whole point: a Session that never turned
-        // the panel on does not get to read or write the plan. Subagents have no
+        // the panel on does not get to read or write a board. Subagents have no
         // composer and no switch, so they report back instead.
         if (isSubagent(exec.agent)) {
           throw new Error('这是子对话：没有计划面板，也没有开关。请把要改的地方回报给主对话，由主对话改计划')
@@ -699,15 +774,47 @@ export async function registerTool(ctx, options = {}) {
         if (!sessionEnabled(exec.agent)) {
           throw new Error('本会话没有启用计划面板：请先在输入框上方把「计划」开关打开')
         }
-        if (args.action === 'create') {
-          const cwd = await planCwd(ctx, exec)
-          if (cwd === undefined) throw new Error('拿不到会话工作区，无法创建计划')
-          const created = await createPlanFile(resolve(cwd, PLAN_FILE), args.title ?? '')
-          if (!created.ok) throw new Error(created.error === 'already-exists' ? '计划文件已存在' : created.error)
-          return { text: `已创建空计划（rev ${created.rev}）。发一条 add 加第一件事。` }
+
+        // Another conversation's private board: readable by id, never writable.
+        // Its file is derived from the id alone, so a crafted id cannot redirect it.
+        if (typeof args.board === 'string' && args.board.startsWith('session:')) {
+          if (args.action !== 'read') throw new Error('别的会话的私板只能读，不能改')
+          const other = args.board.slice('session:'.length).trim()
+          if (!isBoardSessionId(other)) throw new Error('会话 id 不合法：只能用会话 id，不能是路径')
+          const read = await readPlanFile(privateBoardFile(other))
+          if (!read.ok) throw new Error(read.error === 'missing' ? '那个会话还没有私板' : read.error)
+          return { text: `【另一个会话的私板 · 只读】\n\n${summarize(read.plan)}` }
         }
-        const { file, plan } = await withPlan(exec)
-        if (args.action === 'read') return { text: summarize(plan) }
+        if (args.board !== undefined && args.board !== 'public' && args.board !== 'private') {
+          throw new Error('board 只能是 public、private，或 session:<会话 id>')
+        }
+
+        const target = await pickBoard(ctx, exec, args.board)
+        if (target.path === undefined) {
+          throw new Error(target.board === 'private'
+            ? '拿不到会话 id，读不到本会话的私板'
+            : '拿不到会话工作区，读不到工作区公板')
+        }
+        const creating = args.action === 'create'
+        if (!target.exists) {
+          if (args.action === 'read') {
+            throw new Error(`${boardLabel(target.board)}还没有创建。要建就用 create；不确定建哪块就问用户`)
+          }
+          // Any other action means "use this board": creating it is the write.
+          const created = await createPlanFile(target.path, creating ? (args.title ?? '') : '')
+          if (!created.ok) throw new Error(created.error === 'already-exists' ? '这块板已经存在' : created.error)
+          if (creating) return { text: `已创建${boardLabel(target.board)}（rev ${created.rev}）。发一条 add 加第一件事。` }
+        } else if (creating) {
+          throw new Error(`${boardLabel(target.board)}已经存在，不用再建`)
+        }
+
+        const current = await readPlanFile(target.path)
+        if (!current.ok) throw new Error(current.error)
+        const plan = current.plan
+        const other = target.board === 'public' ? target.boards.private : target.boards.public
+        const otherNote = `\n\n另一块板：${boardLabel(target.board === 'public' ? 'private' : 'public')}`
+          + `${other.exists ? '（已存在）' : '（还没有）'}。要改那块请带 board 参数。`
+        if (args.action === 'read') return { text: `【${boardLabel(target.board)}】\n${summarize(plan)}${otherNote}` }
 
         let op
         switch (args.action) {
@@ -765,9 +872,9 @@ export async function registerTool(ctx, options = {}) {
           case 'open': op = { op: 'open' }; break
           default: throw new Error(`不认识的操作 ${args.action}`)
         }
-        const result = await applyOpAndWrite(file, op)
+        const result = await applyOpAndWrite(target.path, op)
         if (!result.ok) throw new Error(result.error)
-        return { text: `${args.action} 完成，rev ${result.rev}。\n\n${summarize(result.plan)}` }
+        return { text: `${args.action} 完成（${boardLabel(target.board)}），rev ${result.rev}。\n\n${summarize(result.plan)}` }
       },
     })
   } catch (error) {
@@ -854,6 +961,7 @@ export function apply(ctx) {
         // beside `path`. Accepted so an older panel keeps working.
         op = { ...payload, op: raw }
         delete op.path
+        delete op.board
       } else {
         return { kind: 'error', text: 'op 字段必须是操作对象，例如 {"path":"…","op":{"op":"toggle","id":"…"}}' }
       }
@@ -866,39 +974,71 @@ export function apply(ctx) {
         return { kind: 'success', text: enabled ? '本会话已启用计划面板' : '本会话已停用计划面板' }
       }
 
-      // Workspace cwd is mandatory (fail-closed) and resolved via planCwd.
-      const cwd = await planCwd(ctx, { agent })
-      if (typeof cwd !== 'string' || cwd === '') {
-        return { kind: 'error', text: '拿不到会话工作区，无法修改计划文件' }
+      // Which tab the panel is on. The tool uses it as its default board.
+      if (op.op === 'active') {
+        const sessionId = sessionIdOf(agent)
+        if (sessionId === undefined) return { kind: 'error', text: '拿不到会话 id，无法记住当前页签' }
+        if (op.board !== 'public' && op.board !== 'private') return { kind: 'error', text: 'active 需要一个 board' }
+        activeBoards.set(sessionId, op.board)
+        return { kind: 'success', text: `当前页签：${boardLabel(op.board)}` }
       }
 
+      // Both boards' paths and existence, for the panel's tab bar and empty
+      // states. Reading needs no file, so this works before anything exists.
+      if (op.op === 'boards') {
+        const boards = await resolveBoards(ctx, { agent })
+        return { kind: 'success', text: JSON.stringify({
+          cwd: boards.cwd ?? null,
+          public: { path: boards.public.path ?? null, exists: boards.public.exists },
+          private: { path: boards.private.path ?? null, exists: boards.private.exists },
+        }) }
+      }
+
+      const board = payload.board
+      if (board !== undefined && board !== 'public' && board !== 'private') {
+        return { kind: 'error', text: 'board 只能是 public 或 private' }
+      }
+
+      // Workspace cwd is mandatory for the public board (fail-closed); the
+      // private board is anchored to the Session id and needs no workspace.
+      const cwd = await planCwd(ctx, { agent })
       let file
-      if (typeof payload.path === 'string' && payload.path !== '') {
-        file = isAbsolute(payload.path) ? resolve(payload.path) : resolve(cwd, payload.path)
-      } else if (op.op === 'create') {
-        // Creating is the one write that may not know a path yet: the panel has
-        // nothing to read, so the workspace root decides.
-        file = resolve(cwd, PLAN_FILE)
+      if (board === 'private') {
+        const sessionId = sessionIdOf(agent)
+        if (sessionId === undefined) return { kind: 'error', text: '拿不到会话 id，读不到本会话的私板' }
+        file = privateBoardFile(sessionId)
+        if (file === undefined) return { kind: 'error', text: '会话 id 不能用作目录名，读不到本会话的私板' }
       } else {
-        return { kind: 'error', text: '缺少 path' }
-      }
-      if (basename(file) !== PLAN_FILE) {
-        return { kind: 'error', text: `只允许修改名为 ${PLAN_FILE} 的文件` }
-      }
-      if (!(await insideWorkspace(cwd, file))) {
-        return { kind: 'error', text: `路径不在会话工作区内：${file}` }
+        if (typeof cwd !== 'string' || cwd === '') {
+          return { kind: 'error', text: '拿不到会话工作区，无法修改计划文件' }
+        }
+        if (typeof payload.path === 'string' && payload.path !== '') {
+          file = isAbsolute(payload.path) ? resolve(payload.path) : resolve(cwd, payload.path)
+        } else if (op.op === 'create') {
+          // Creating is the one write that may not know a path yet: the panel has
+          // nothing to read, so the workspace root decides.
+          file = resolve(cwd, PLAN_FILE)
+        } else {
+          return { kind: 'error', text: '缺少 path' }
+        }
+        if (basename(file) !== PLAN_FILE) {
+          return { kind: 'error', text: `只允许修改名为 ${PLAN_FILE} 的文件` }
+        }
+        if (!(await insideWorkspace(cwd, file))) {
+          return { kind: 'error', text: `路径不在会话工作区内：${file}` }
+        }
       }
 
       if (op.op === 'create') {
         const created = await createPlanFile(file, typeof op.title === 'string' ? op.title : '')
-        if (created.ok) return { kind: 'success', text: `已创建计划 rev ${created.rev}` }
-        return { kind: 'error', text: created.error === 'already-exists' ? '计划文件已存在' : created.error }
+        if (created.ok) return { kind: 'success', text: `已创建${boardLabel(board === 'private' ? 'private' : 'public')} rev ${created.rev}` }
+        return { kind: 'error', text: created.error === 'already-exists' ? '这块板已存在' : created.error }
       }
 
       const beforeRead = op.op === 'remove' ? await readPlanFile(file) : undefined
       const result = await applyOpAndWrite(file, op)
       if (!result.ok) return { kind: 'error', text: result.error }
-      notifyAgent(agent, describeOp(op, result.plan, beforeRead?.plan), result.plan.ui)
+      notifyAgent(agent, describeOp(op, result.plan, beforeRead?.plan), result.plan.ui, board === 'private' ? 'private' : 'public')
       const notes = Array.isArray(result.notes) ? result.notes : []
       if (op.op === 'repair') {
         if (notes.length === 0) return { kind: 'success', text: '文件没有问题，不需要修复' }
